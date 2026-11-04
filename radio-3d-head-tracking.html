@@ -73,6 +73,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .stItem .t { min-width: 0; display: grid; }
 .stItem .t b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stItem .t span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stRow { display: flex; gap: 6px; min-width: 0; }
+.stRow .stItem { flex: 1 1 auto; }
+.stFav { flex: none; width: 40px; background: #0c1014; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; font-size: 18px; cursor: pointer; }
+.stFav[aria-pressed=true] { color: var(--cyan); border-color: var(--cyan); }
+.stMore { justify-self: start; }
+#stTabs button[aria-pressed=true] { border-color: var(--cyan); color: var(--cyan); background: #0d1d1d; }
 .stCompare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; align-items: start; }
 .stCompare figure { margin: 0; display: grid; gap: 6px; }
 .stCompare img, .stCompare canvas { width: 100%; max-height: 140px; object-fit: contain; background: #000; border: 1px solid var(--line); border-radius: 6px; }
@@ -182,12 +188,17 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
 
   <section class="card" aria-labelledby="h-st">
     <h2 id="h-st">Real stations</h2>
-    <small class="note">Searches the free Radio Browser directory of internet stations (needs an internet connection). Pick one to hear it and see how its real logo comes out on the radio.</small>
+    <small class="note">Searches the free Radio Browser directory of internet stations worldwide (needs an internet connection). Pick one to hear it and see how its real logo comes out on the radio. Tap ☆ to keep a station in Favourites.</small>
     <div class="row">
       <input class="stIn" id="stQ" type="search" value="synthwave" placeholder="Station name or genre" aria-label="Station name or genre">
       <select class="stSel" id="stBy" aria-label="Search by"><option value="tag">Genre</option><option value="name">Name</option></select>
-      <select class="stSel" id="stCountry" aria-label="Country"><option value="">Any country</option><option value="US" selected>United States</option><option value="GB">United Kingdom</option><option value="DE">Germany</option></select>
+      <select class="stSel" id="stCountry" aria-label="Country"><option value="">Any country</option><option value="US" selected>United States</option></select>
+      <select class="stSel" id="stLang" aria-label="Language"><option value="">Any language</option></select>
       <button type="button" id="stGo">Search</button>
+    </div>
+    <div class="row" id="stTabs" role="group" aria-label="Station lists">
+      <button type="button" id="stTop">Top stations</button>
+      <button type="button" id="stFavs">Favourites</button>
     </div>
     <div class="row" id="stQuick" role="group" aria-label="Quick searches">
       <button type="button" data-q="synthwave" data-by="tag">Synthwave</button>
@@ -212,6 +223,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
       <figure><canvas id="stArt" width="520" height="220"></canvas><figcaption>Converted for the radio</figcaption></figure>
     </div>
     <div class="stList" id="stList"></div>
+    <div class="row"><button type="button" class="stMore" id="stMore" hidden>Show more</button></div>
   </section>
 
   <section class="card" aria-labelledby="h-music">
@@ -1207,21 +1219,75 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   const RB_HOSTS = ['all.api.radio-browser.info', 'de1.api.radio-browser.info', 'de2.api.radio-browser.info', 'fi1.api.radio-browser.info', 'nl1.api.radio-browser.info'];
   let stImg = null, stCur = null, plainEl = null;
   const stStatus = t => { $('stStatus').textContent = t; };
-  async function rbSearch(q, by, cc) {
-    const params = new URLSearchParams({ limit: '40', hidebroken: 'true', order: 'clickcount', reverse: 'true' });
-    params.set(by, q); if (cc) params.set('countrycode', cc);
+  const PAGE = 60;
+  async function rbGet(path, params) {
     for (const h of RB_HOSTS) {
       try {
-        const r = await fetch(`https://${h}/json/stations/search?${params}`);
-        if (r.ok) return (await r.json()).filter(st => st.url_resolved && !st.hls);
+        const r = await fetch(`https://${h}/json/${path}${params ? '?' + params : ''}`);
+        if (r.ok) return await r.json();
       } catch (e) {}
     }
     throw new Error('the Radio Browser directory could not be reached');
   }
-  function renderList(list) {
-    const box = $('stList'); box.innerHTML = '';
-    if (!list.length) { box.textContent = 'No stations found. Try another search.'; return; }
+  // q empty = no text filter, so the list is simply the most played stations for the chosen country and language
+  async function rbSearch(q, by, offset) {
+    const params = new URLSearchParams({ limit: String(PAGE), offset: String(offset), hidebroken: 'true', order: 'clickcount', reverse: 'true' });
+    if (q) params.set(by, q);
+    const cc = $('stCountry').value, lang = $('stLang').value;
+    if (cc) params.set('countrycode', cc);
+    if (lang) params.set('language', lang);
+    return await rbGet('stations/search', params);
+  }
+
+  // country and language menus, filled from the directory with station counts
+  (async () => {
+    try {
+      const cs = await rbGet('countries', new URLSearchParams({ order: 'name', hidebroken: 'true' }));
+      const sel = $('stCountry'), keep = sel.value;
+      sel.innerHTML = '<option value="">Any country</option>';
+      cs.filter(c => c.iso_3166_1 && c.stationcount > 0).forEach(c => {
+        const o = document.createElement('option'); o.value = c.iso_3166_1.toUpperCase();
+        o.textContent = `${c.name} (${c.stationcount})`; sel.appendChild(o);
+      });
+      sel.value = keep;
+    } catch (e) {}
+    try {
+      const ls = await rbGet('languages', new URLSearchParams({ order: 'stationcount', reverse: 'true', hidebroken: 'true' }));
+      const sel = $('stLang');
+      ls.filter(l => l.name && l.stationcount >= 20).slice(0, 80).sort((a, b) => a.name.localeCompare(b.name)).forEach(l => {
+        const o = document.createElement('option'); o.value = l.name;
+        o.textContent = `${l.name[0].toUpperCase() + l.name.slice(1)} (${l.stationcount})`; sel.appendChild(o);
+      });
+    } catch (e) {}
+  })();
+
+  // favourites live in this browser only
+  const FAV_KEY = 'radio3d-favs';
+  const loadFavs = () => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch (e) { return []; } };
+  const saveFavs = f => { try { localStorage.setItem(FAV_KEY, JSON.stringify(f)); } catch (e) {} };
+  let favs = loadFavs();
+  const favId = st => st.stationuuid || st.url_resolved;
+  const isFav = st => favs.some(f => favId(f) === favId(st));
+  function toggleFav(st) {
+    if (isFav(st)) favs = favs.filter(f => favId(f) !== favId(st));
+    else favs.push({ stationuuid: st.stationuuid, name: st.name, url: st.url, url_resolved: st.url_resolved, favicon: st.favicon, countrycode: st.countrycode,
+                     country: st.country, state: st.state, codec: st.codec, bitrate: st.bitrate, tags: st.tags });
+    saveFavs(favs);
+  }
+
+  let view = { kind: 'search', q: '', by: 'tag', offset: 0, seen: new Set() };
+  function setTab(kind) {
+    $('stTop').setAttribute('aria-pressed', String(kind === 'top'));
+    $('stFavs').setAttribute('aria-pressed', String(kind === 'favs'));
+  }
+  function renderList(list, append) {
+    const box = $('stList');
+    if (!append) { box.innerHTML = ''; view.seen = new Set(); box.scrollTop = 0; }
+    list = list.filter(st => st.url_resolved && !st.hls && !view.seen.has(favId(st)));
+    if (!append && !list.length) { box.textContent = view.kind === 'favs' ? 'No favourites yet. Tap the ☆ next to a station to add it.' : 'No stations found. Try another search.'; return 0; }
     list.forEach(st => {
+      view.seen.add(favId(st));
+      const row = document.createElement('div'); row.className = 'stRow';
       const b = document.createElement('button'); b.type = 'button'; b.className = 'stItem'; b.setAttribute('aria-pressed', 'false');
       const im = document.createElement('img'); im.alt = ''; im.loading = 'lazy'; if (st.favicon) im.src = st.favicon; im.onerror = () => { im.style.visibility = 'hidden'; };
       const t = document.createElement('span'); t.className = 't';
@@ -1230,17 +1296,52 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
       d.textContent = [st.countrycode, st.codec, st.bitrate ? st.bitrate + ' kbps' : '', (st.tags || '').split(',').slice(0, 3).join(', '), st.favicon ? '' : 'no logo'].filter(Boolean).join(' · ');
       t.append(n, d); b.append(im, t);
       b.addEventListener('click', () => { box.querySelectorAll('.stItem').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); selectStation(st); });
-      box.appendChild(b);
+      const f = document.createElement('button'); f.type = 'button'; f.className = 'stFav';
+      const showFav = () => { const on = isFav(st); f.textContent = on ? '★' : '☆'; f.setAttribute('aria-pressed', String(on)); f.setAttribute('aria-label', (on ? 'Remove ' : 'Add ') + st.name.trim() + (on ? ' from favourites' : ' to favourites')); };
+      f.addEventListener('click', () => { toggleFav(st); showFav(); if (view.kind === 'favs' && !isFav(st)) row.remove(); });
+      showFav();
+      row.append(b, f); box.appendChild(row);
     });
+    return list.length;
   }
-  async function doSearch(q, by) {
-    q = (q || '').trim(); if (!q) return;
-    stStatus('Searching…');
-    try { const list = await rbSearch(q, by, $('stCountry').value); renderList(list); stStatus(`${list.length} stations found. Pick one.`); }
-    catch (e) { stStatus('Search failed: ' + e.message + '. Check your internet connection.'); }
+  async function runSearch(kind, q, by) {
+    view = { kind, q: (q || '').trim(), by, offset: 0, seen: new Set() };
+    setTab(kind); $('stMore').hidden = true;
+    if (kind === 'search' && !view.q) return;
+    stStatus(kind === 'top' ? 'Loading the most played stations…' : 'Searching…');
+    try {
+      const list = await rbSearch(view.q, by, 0);
+      const n = renderList(list, false);
+      $('stMore').hidden = list.length < PAGE;
+      const where = [$('stCountry').selectedOptions[0], $('stLang').selectedOptions[0]].filter(o => o && o.value).map(o => o.textContent.replace(/ \(\d+\)$/, '')).join(', ');
+      stStatus(kind === 'top' ? `Most played stations${where ? ' · ' + where : ' worldwide'}. Pick one.` : `${n} stations found${list.length >= PAGE ? ', most played first' : ''}. Pick one.`);
+    } catch (e) { stStatus('Search failed: ' + e.message + '. Check your internet connection.'); }
   }
+  async function showMore() {
+    const btn = $('stMore'); btn.disabled = true; btn.textContent = 'Loading…';
+    try {
+      view.offset += PAGE;
+      const list = await rbSearch(view.q, view.by, view.offset);
+      renderList(list, true);
+      btn.hidden = list.length < PAGE;
+      stStatus(`${view.seen.size} stations shown.`);
+    } catch (e) { stStatus('Could not load more: ' + e.message + '.'); }
+    btn.disabled = false; btn.textContent = 'Show more';
+  }
+  function showFavs() {
+    view = { kind: 'favs', q: '', by: '', offset: 0, seen: new Set() };
+    setTab('favs'); $('stMore').hidden = true;
+    renderList(favs.slice(), false);
+    stStatus(favs.length ? `${favs.length} favourite${favs.length === 1 ? '' : 's'}. Saved in this browser.` : 'No favourites yet.');
+  }
+  const doSearch = (q, by) => runSearch('search', q, by);
   $('stGo').addEventListener('click', () => doSearch($('stQ').value, $('stBy').value));
   $('stQ').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch($('stQ').value, $('stBy').value); });
+  $('stTop').addEventListener('click', () => runSearch('top', '', 'tag'));
+  $('stFavs').addEventListener('click', showFavs);
+  $('stMore').addEventListener('click', showMore);
+  // changing country or language re-runs whatever list is showing
+  ['stCountry', 'stLang'].forEach(id => $(id).addEventListener('change', () => { if (view.kind === 'top') runSearch('top', '', 'tag'); else if (view.kind === 'search' && view.q) runSearch('search', view.q, view.by); }));
   $('stQuick').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     $('stQ').value = b.dataset.q; $('stBy').value = b.dataset.by; doSearch(b.dataset.q, b.dataset.by);
