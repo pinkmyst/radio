@@ -40,5 +40,6 @@ BROWSER="$(command -v chromium || command -v chromium-browser)"
   --noerrdialogs \
   --disable-session-crashed-bubble \
   --autoplay-policy=no-user-gesture-required \
+  --password-store=basic \
   --user-data-dir="$PROFILE" \
   "$PAGE"
