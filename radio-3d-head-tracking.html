@@ -4,9 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Radio 3D Screen · Head Tracking</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Rajdhani:wght@300;400;500;600;700&family=Saira+Semi+Condensed:wght@300;400;500;600;700&family=Barlow+Semi+Condensed:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- Offline: fonts, the 3D engine and the face tracker are served from the vendor folder next to this page (see vendor/README.md). -->
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
 <style>
 /* Layout: the 1920x720 radio screen as the hero, set in a dark bezel; a single control strip under it. Single dark look on purpose. */
 :root {
@@ -399,14 +398,14 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   <p class="note">This copy runs on your own computer so it can use your webcam for head tracking. When no face is found, it falls back to the slow drift. Head tracking is right for one viewer: close one eye for the strongest effect. With music playing, bass bands use a 2048-point analysis and treble bands a faster 512-point one, so hits stay snappy. Bars jump up instantly and fall back slowly. The station, song text and logo are placeholders, not the game's. Built with three.js, which can run full-screen on the Pi 5.</p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/MaskPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="vendor/three-0.147.0/three.min.js"></script>
+<script src="vendor/three-0.147.0/CopyShader.js"></script>
+<script src="vendor/three-0.147.0/LuminosityHighPassShader.js"></script>
+<script src="vendor/three-0.147.0/EffectComposer.js"></script>
+<script src="vendor/three-0.147.0/RenderPass.js"></script>
+<script src="vendor/three-0.147.0/ShaderPass.js"></script>
+<script src="vendor/three-0.147.0/MaskPass.js"></script>
+<script src="vendor/three-0.147.0/UnrealBloomPass.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -1628,7 +1627,8 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
 const $ = id => document.getElementById(id);
 const H = window.radioHead;
 const VER = '0.10.14';
-const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
+const VENDOR = new URL('vendor/', location.href).href;   // everything is loaded from the folder next to this page, nothing from the internet
+const MODEL = VENDOR + 'models/blaze_face_short_range.tflite';
 const EYE_MM = 63;          // average distance between pupils
 const CAM_HFOV = 62;        // typical laptop / USB webcam
 
@@ -1676,8 +1676,8 @@ async function start() {
     $('trkBtn').disabled = true;
     if (!detector) {
       status('Loading the face tracker…');
-      const vision = await import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/vision_bundle.mjs`);
-      const files = await vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/wasm`);
+      const vision = await import(`${VENDOR}mediapipe-tasks-vision-${VER}/vision_bundle.mjs`);
+      const files = await vision.FilesetResolver.forVisionTasks(`${VENDOR}mediapipe-tasks-vision-${VER}/wasm`);
       const opts = d => ({ baseOptions: { modelAssetPath: MODEL, delegate: d }, runningMode: 'VIDEO', minDetectionConfidence: 0.5 });
       try { detector = await vision.FaceDetector.createFromOptions(files, opts('GPU')); }
       catch (e) { detector = await vision.FaceDetector.createFromOptions(files, opts('CPU')); }
