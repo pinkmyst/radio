@@ -11,7 +11,7 @@
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PORT=8080
 BASE="http://127.0.0.1:$PORT"
-PAGE="$BASE/radio-3d-head-tracking.html"
+PAGE="$BASE/radio-3d-head-tracking.html?kiosk=1"
 PROFILE="$HOME/.config/infinity-radio-kiosk"
 
 up() { curl -s -o /dev/null --max-time 2 "$BASE/radio-3d-head-tracking.html"; }

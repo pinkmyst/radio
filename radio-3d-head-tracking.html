@@ -1530,7 +1530,23 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     stStatus('Loading the logo…');
     stImg = await fetchLogo(st.favicon);
     stStatus(applyLogo());
+    // remember the station (this browser only) so the radio can resume it at power-on
+    try {
+      localStorage.setItem(LAST_KEY, JSON.stringify({ stationuuid: st.stationuuid, name: st.name, url: st.url, url_resolved: st.url_resolved, favicon: st.favicon,
+        countrycode: st.countrycode, country: st.country, state: st.state, codec: st.codec, bitrate: st.bitrate, tags: st.tags }));
+    } catch (e) {}
     playStream(st);
+  }
+  // Radio start (?kiosk=1, used when the Pi powers on): screen only, and resume the last station (or the first favourite)
+  const LAST_KEY = 'radio3d-last';
+  if (new URLSearchParams(location.search).get('kiosk') === '1') {
+    setTimeout(() => {
+      if (!screenEl.classList.contains('big')) $('zBig').click();
+      let st = null;
+      try { st = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) {}
+      if (!st || !(st.url_resolved || st.url)) st = favs[0] || null;
+      if (st && st.name && (st.url_resolved || st.url)) selectStation(st);
+    }, 0);
   }
   $('stLogoStyle').addEventListener('change', () => { if (stCur) stStatus(applyLogo()); });
 
