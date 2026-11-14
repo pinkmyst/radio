@@ -140,6 +140,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
         <button type="button" id="zOut" aria-label="Zoom out">−</button>
         <output id="zLbl">1×</output>
         <button type="button" id="zIn" aria-label="Zoom in">+</button>
+        <button type="button" id="lookBtn" title="Switch between the radio's layout and the phone app's layout (reloads). Shortcut: L">Look: Radio</button>
         <button type="button" id="zBig" aria-pressed="false">Big view</button>
       </div>
     </div>
@@ -435,6 +436,24 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     } catch (e) { return false; }
   })();
 
+  // Two layouts to compare side by side (Juan, 2026-11-14):
+  //  'radio' = this page's own layout, with Juan's tuned settings (the reference);
+  //  'app'   = the phone app's sideways layout, measured from stills of the in-game radio
+  //            (numbers from the app's PlayerScreen.kt: outline, bar size and spacing, text, logo, the line through the logo).
+  // Chosen with the "Look" button, the L key, or "?look=app" / "?look=radio" in the address; the page reloads to switch.
+  const LOOK = (() => {
+    const q = new URLSearchParams(location.search).get('look');
+    if (q === 'app' || q === 'radio') return q;
+    let saved = null; try { saved = localStorage.getItem('look'); } catch (e) {}
+    return saved === 'app' ? 'app' : 'radio';
+  })();
+  const APP = LOOK === 'app';
+  const LK = APP
+    ? { pitchX: 9.6, eqX0: -126, eqH: 2.6, eqGap: 2.5, npRight: -38, npY: 41, mqW: 98, mqY: 27,
+        infoX: 83.2, infoY: 22.8, infoS: 1.3, playX: 110, playY: 40, playS: 9 / 8, logoX: 62, logoY: -12, logoS: 0.64 }
+    : { pitchX: 11.2, eqX0: -130, eqH: 1.9, eqGap: 3.2, npRight: -24, npY: 44, mqW: 112, mqY: 30,
+        infoX: 50, infoY: 33, infoS: 1, playX: 104, playY: 45, playS: 1, logoX: 56, logoY: 2, logoS: 1 };
+
   let renderer;
   // edge smoothing on the canvas is thrown away by the glow pass, so Pi mode does not ask for it
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: !PI_MODE }); }
@@ -486,8 +505,8 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   const FONT_M = '500 {px} "IBM Plex Mono", monospace';
 
   // ---------- EQ cubes (instanced, custom shading) ----------
-  const BANDS = 11, SEGS = 12, PITCH_X = 11.2, CUBE_W = 7.6, CUBE_H = 2.4, CUBE_D = 6, PITCH_Y = 4;
-  const EQ_X0 = -130, EQ_Y0 = -40, EQ_Z = -16;
+  const BANDS = 11, SEGS = 12, PITCH_X = LK.pitchX, CUBE_W = 7.6, CUBE_H = 2.4, CUBE_D = 6, PITCH_Y = 4;
+  const EQ_X0 = LK.eqX0, EQ_Y0 = -40, EQ_Z = -16;
   // brightness and colour tunables (1 = neutral); defaults follow the game footage
   const TUNE = { topCount: 2, topWhite: 0.1, topBright: 1.65, eqBright: 1.0, edge: 0.35, peaks: false,
                  outline: 3, logo: 0.65, play: 2.5, title: 1.0, info: 1.5, infoCyan: 0.95, labels: 1.85, outlineCyan: 0.8, logoCyan: 0.3, playCyan: 0.8 };
@@ -550,7 +569,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   const m4 = new THREE.Matrix4();
   const qI = new THREE.Quaternion(), vP = new THREE.Vector3(), vS = new THREE.Vector3();
   let eqPitch = PITCH_Y;
-  const EQ_DIM = { gap: 3.2, h: 1.9, w: 6.9, d: 5.5 };   // mm: gap between pieces in a bar, piece width, piece depth
+  const EQ_DIM = { gap: LK.eqGap, h: LK.eqH, w: 6.9, d: 5.5 };   // mm: gap between pieces in a bar, piece width, piece depth
   function layoutEQ() {
     const h = EQ_DIM.h, w = EQ_DIM.w, d = EQ_DIM.d;
     eqPitch = h + EQ_DIM.gap;
@@ -603,17 +622,17 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   const npC = textCanvas('NOW PLAYING', 64, FONT_D6);
   const npH = 6.5, npW = npH * npC.width / npC.height;
   const nowPlaying = extruded(npC, npW, npH, 8, 2.5, 0.55);
-  nowPlaying.position.set(-24 - npW / 2, 44, -6);
+  nowPlaying.position.set(LK.npRight - npW / 2, LK.npY, -6);
   world.add(nowPlaying);
 
   let mqText = 'NEON DRIFT  ·  97.1 FM  ·  MIDNIGHT FREQUENCIES  ·  ';
   const mqC = textCanvas(mqText, 120, FONT_D, 0);
-  const MQ_H = 15, MQ_W = 112;
+  const MQ_H = 15, MQ_W = LK.mqW;
   let mqTextW = MQ_H * mqC.width / mqC.height;
   const marquee = extruded(mqC, MQ_W, MQ_H, 16, 6, 0.55);
   marquee.userData.tex.wrapS = THREE.RepeatWrapping;
   marquee.userData.tex.repeat.x = MQ_W / mqTextW;
-  marquee.position.set(-136 + MQ_W / 2, 30, -10);
+  marquee.position.set(-136 + MQ_W / 2, LK.mqY, -10);
   world.add(marquee);
 
   // band labels (flat)
@@ -639,7 +658,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   ig.fillStyle = '#fff'; ig.font = '500 34px "IBM Plex Mono", monospace'; ig.textBaseline = 'top';
   ['IMAGE NAME:   NIGHTJAR-4.2.0', 'IMAGE TYPE:   ARM64 KERNEL IMAGE', '(LZ4 COMPRESSED)', 'LOAD ADDRESS: 0x00080000'].forEach((l, i) => ig.fillText(l, 4, 6 + i * 48));
   const info = extruded(infoC, 88, 88 * 200 / 1024, 4, 1.2, 0.5);
-  info.position.set(6 + 44, 33, -5);
+  info.position.set(LK.infoX, LK.infoY, -5); info.scale.set(LK.infoS, LK.infoS, 1);
   world.add(info);
 
   function setInfoLines(lines) {
@@ -651,7 +670,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   const playC = mkCanvas(128, 128), pg = playC.getContext('2d');
   pg.fillStyle = '#fff'; pg.fillRect(18, 18, 16, 92); pg.beginPath(); pg.moveTo(46, 18); pg.lineTo(112, 64); pg.lineTo(46, 110); pg.closePath(); pg.fill();
   const play = extruded(playC, 8, 8, 6, 2.5, 0.55);
-  play.position.set(104, 45, -5);
+  play.position.set(LK.playX, LK.playY, -5); play.scale.set(LK.playS, LK.playS, 1);
   world.add(play);
 
   const logoC = mkCanvas(1040, 440), logoG = logoC.getContext('2d');
@@ -680,7 +699,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   }
   drawLogo(false);
   const logo = extruded(logoC, 100, 100 * 440 / 1040, 18, 8, 0.6);
-  logo.position.set(56, 2, -12);
+  logo.position.set(LK.logoX, LK.logoY, -12); logo.scale.set(LK.logoS, LK.logoS, 1);
   world.add(logo);
 
   // ---------- cyan outline on the glass (physical neon on the real radio) ----------
@@ -698,6 +717,24 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     return new THREE.Mesh(new THREE.TubeGeometry(path, 400, r, 6, false), neonMat);
   }
   const P = (x, y, c) => ({ x, y, c });
+  if (APP) {
+    // the app's panel: a bigger cut corner top left and a long diagonal on the right
+    outline.add(tubePath([
+      P(-141, 37), P(-128, 51),
+      P(-37, 51), P(-31, 51, 1), P(-31, 45),
+      P(-31, 27), P(-4, -3),
+      P(-4, -45), P(-4, -51, 1), P(-10, -51),
+      P(-135, -51), P(-141, -51, 1), P(-141, -45),
+      P(-141, 37),
+    ], 0.75));
+    // the second line runs through the middle of the logo, which interrupts it, then turns up and off the right edge
+    const gapL = LK.logoX - 34.5, gapR = LK.logoX + 34.5;
+    outline.add(tubePath([P(-4, LK.logoY), P(gapL, LK.logoY)], 0.75));
+    outline.add(tubePath([
+      P(gapR, LK.logoY), P(116, LK.logoY), P(124, LK.logoY, 1), P(124, LK.logoY + 8),
+      P(124, 38), P(124, 46, 1), P(132, 46), P(146, 46),
+    ], 0.75));
+  } else {
   outline.add(tubePath([
     P(-141, 43), P(-133, 51),
     P(-26, 51), P(-20, 51, 1), P(-20, 45),
@@ -710,6 +747,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     P(-4, -22), P(110, -22), P(118, -22, 1), P(118, -14),
     P(118, 42), P(118, 50, 1), P(126, 50), P(146, 50),
   ], 0.75));
+  }
 
   // ---------- ghost echoes: the game's mirror ghosts, drawn in software at real depths ----------
   const GHOST_F = [0.4, 0.16];
@@ -952,7 +990,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     const c = textCanvas('NOW PLAYING', 64, FONT_D6);
     swapTex(nowPlaying, c);
     const newW = npH * c.width / c.height;
-    nowPlaying.scale.x = newW / npW; nowPlaying.position.x = -24 - newW / 2;
+    nowPlaying.scale.x = newW / npW; nowPlaying.position.x = LK.npRight - newW / 2;
     setStationCanvas(textCanvas(mqText, 120, FONT_D, 0));
   }
   function setStationText(str) { mqText = str + '  ·  '; setStationCanvas(textCanvas(mqText, 120, FONT_D, 0)); }
@@ -1152,6 +1190,21 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   $('zIn').addEventListener('click', () => setZoom(ZOOM.k * 1.5, ZOOM.cx, ZOOM.cy));
   $('zOut').addEventListener('click', () => setZoom(ZOOM.k / 1.5, ZOOM.cx, ZOOM.cy));
   $('zPreset').addEventListener('change', e => { const z = ZPRESET[e.target.value]; setZoom(z[0], z[1], z[2]); });
+  // Look switch: remembers the choice, reloads, and comes back in big view if you were in it
+  $('lookBtn').textContent = APP ? 'Look: App' : 'Look: Radio';
+  const switchLook = () => {
+    try {
+      localStorage.setItem('look', APP ? 'radio' : 'app');
+      sessionStorage.setItem('lookBig', screenEl.classList.contains('big') ? '1' : '0');
+    } catch (e) {}
+    const u = new URL(location.href); u.searchParams.delete('look'); location.replace(u.href);
+  };
+  $('lookBtn').addEventListener('click', switchLook);
+  window.addEventListener('keydown', e => {
+    if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|SELECT|TEXTAREA/.test((e.target && e.target.tagName) || '')) switchLook();
+  });
+  $('eqGap').value = EQ_DIM.gap; $('eqH').value = EQ_DIM.h; S.eqGap = EQ_DIM.gap;
+  setTimeout(() => { try { if (sessionStorage.getItem('lookBig') === '1') { sessionStorage.removeItem('lookBig'); $('zBig').click(); } } catch (e) {} }, 0);
   $('zBig').addEventListener('click', () => {
     const on = !screenEl.classList.contains('big');
     screenEl.classList.toggle('big', on); document.body.classList.toggle('bigview', on);
