@@ -417,13 +417,22 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
   const CY = new THREE.Color(0.31, 0.94, 0.90);
 
   // Pi mode: the same picture with less wasted drawing, for the Raspberry Pi (measured 2026-11-14: 24.9 -> 36.6 fps).
-  // On by default on ARM devices (the Pi); "?pi=1" or "?pi=0" in the address, or the tick box, overrides that.
+  // On by default on the Pi (ARM processor or Broadcom graphics chip); "?pi=1" or "?pi=0" in the address, or the tick box, overrides that.
   const PI_MODE = (() => {
     const q = new URLSearchParams(location.search).get('pi');
     if (q === '1' || q === '0') return q === '1';
     let saved = null; try { saved = localStorage.getItem('piMode'); } catch (e) {}
     if (saved === '1' || saved === '0') return saved === '1';
-    return /aarch64|armv/i.test((navigator.userAgent || '') + ' ' + (navigator.platform || ''));
+    if (/aarch64|armv/i.test((navigator.userAgent || '') + ' ' + (navigator.platform || ''))) return true;
+    // Chromium on the Pi does not say "ARM" in its name, so also ask which graphics chip is drawing:
+    // the Pi's is Broadcom's V3D / VideoCore.
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) + ' ' + String(gl.getParameter(ext.UNMASKED_VENDOR_WEBGL)) : '';
+      const lose = gl && gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+      return /V3D|VideoCore|Broadcom/i.test(name);
+    } catch (e) { return false; }
   })();
 
   let renderer;
