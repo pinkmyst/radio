@@ -912,6 +912,22 @@ body.bigview .bezel .cap { visibility: hidden; }
     renderer.setPixelRatio(pr); renderer.setSize(w, h, false);
     composer.setPixelRatio(pr); composer.setSize(w, h);
     if (PI.glow === 'half') bloom.setSize(Math.round(w * pr / 2), Math.round(h * pr / 2));
+    piGlowReach(fixed ? w * pr / (PI.glow === 'half' ? 2 : 1) : 1920);
+  }
+  // The glow is five blur steps, each reaching twice as far as the one before, measured in drawn pixels.
+  // Built from a smaller picture, the same steps reach further across the screen ("the whole radio glows").
+  // This re-weights the steps so the glow reaches as far as it does at the full 1920 x 720, whatever size it is built at.
+  function piGlowReach(inW) {
+    const u = bloom.compositeMaterial.uniforms;
+    const d = Math.max(0, Math.log2(1920 / inW));
+    if (d < 0.01) { u.bloomFactors.value = [1.0, 0.8, 0.6, 0.4, 0.2]; bloom.radius = 0.45; return; }
+    const full = [1.0, 0.8, 0.6, 0.4, 0.2].map(f => f + (1.2 - f - f) * 0.45);   // the original weights at radius 0.45
+    const out = [0, 0, 0, 0, 0];
+    full.forEach((wt, l) => {
+      const pos = Math.max(0, l - d), j = Math.floor(pos), t = pos - j;
+      out[j] += wt * (1 - t); if (j + 1 < 5) out[j + 1] += wt * t;
+    });
+    u.bloomFactors.value = out; bloom.radius = 0;   // radius 0 = use the weights exactly as given
   }
   new ResizeObserver(resize).observe(screenEl);
   window.addEventListener('resize', resize);
