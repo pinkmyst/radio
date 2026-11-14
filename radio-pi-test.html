@@ -172,6 +172,8 @@ body.bigview .bezel .cap { visibility: hidden; }
           <select id="piFlat"><option value="0">Drawn (original)</option><option value="1">Skipped</option></select>
           <label for="piGl">Ghost text layers</label>
           <select id="piGl"><option value="full">Full (original)</option><option value="thin">Thinner</option></select>
+          <label for="piEz">Covered pixels</label>
+          <select id="piEz"><option value="0">Painted (original)</option><option value="1">Skipped</option></select>
           <label for="piSkip">Skip repeat work</label>
           <select id="piSkip"><option value="0">Off (original)</option><option value="1">On</option></select>
           <label for="piAa">Edge smoothing</label>
@@ -468,8 +470,9 @@ body.bigview .bezel .cap { visibility: hidden; }
     size: pick('size', ['real', 'fill'], 'real'),
     flat: pick('flat', ['0', '1'], '0'),
     gl: pick('gl', ['full', 'thin'], 'full'),
+    ez: pick('ez', ['0', '1'], '0'),
   };
-  const PI_DEFAULT = { glow: 'full', layers: 'full', ghosts: 'on', scale: '1', skip: '0', aa: '1', hdr: '1', view: 'lock', size: 'real', flat: '0', gl: 'full' };
+  const PI_DEFAULT = { glow: 'full', layers: 'full', ghosts: 'on', scale: '1', skip: '0', aa: '1', hdr: '1', view: 'lock', size: 'real', flat: '0', gl: 'full', ez: '0' };
   const PI_RELOAD = ['aa', 'hdr'];   // these can only change when the 3D engine starts
   function piSaveUrl() {
     const q = new URLSearchParams();
@@ -1232,6 +1235,11 @@ body.bigview .bezel .cap { visibility: hidden; }
         if (flat && i !== 0 && i !== n - 1) v = false;
         if (i % thin !== 0) v = false;
         m.visible = v;
+        // "Covered pixels: Skipped": the copies behind the front one are drawn first, nearest first, as solid shapes,
+        // so the graphics chip can skip every pixel that a nearer copy already covers. The front copy keeps its soft edges.
+        const solid = PI.ez === '1' && i !== 0;
+        if (m.material.transparent === solid) { m.material.transparent = !solid; m.material.needsUpdate = true; }
+        m.renderOrder = solid ? i - 100 : 0;
       });
     }));
   }
