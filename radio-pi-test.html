@@ -919,13 +919,16 @@ body.bigview .bezel .cap { visibility: hidden; }
   // This re-weights the steps so the glow reaches as far as it does at the full 1920 x 720, whatever size it is built at.
   function piGlowReach(inW) {
     const u = bloom.compositeMaterial.uniforms;
-    const d = Math.max(0, Math.log2(1920 / inW));
-    if (d < 0.01) { u.bloomFactors.value = [1.0, 0.8, 0.6, 0.4, 0.2]; bloom.radius = 0.45; return; }
+    const s = 1920 / inW;
+    if (s < 1.01) { u.bloomFactors.value = [1.0, 0.8, 0.6, 0.4, 0.2]; bloom.radius = 0.45; return; }
     const full = [1.0, 0.8, 0.6, 0.4, 0.2].map(f => f + (1.2 - f - f) * 0.45);   // the original weights at radius 0.45
+    const REACH = [6, 20, 56, 144, 352].map(Math.log);   // how far each step reaches (blur size x its shrink factor), as logs
     const out = [0, 0, 0, 0, 0];
     full.forEach((wt, l) => {
-      const pos = Math.max(0, l - d), j = Math.floor(pos), t = pos - j;
-      out[j] += wt * (1 - t); if (j + 1 < 5) out[j + 1] += wt * t;
+      const want = REACH[l] - Math.log(s);               // the reach this step should have, in this smaller picture's steps
+      let j = 0; while (j < 3 && REACH[j + 1] <= want) j++;
+      const t = Math.min(1, Math.max(0, (want - REACH[j]) / (REACH[j + 1] - REACH[j])));
+      out[j] += wt * (1 - t); out[j + 1] += wt * t;
     });
     u.bloomFactors.value = out; bloom.radius = 0;   // radius 0 = use the weights exactly as given
   }
