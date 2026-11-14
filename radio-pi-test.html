@@ -1,0 +1,1795 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Pi Speed Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Rajdhani:wght@300;400;500;600;700&family=Saira+Semi+Condensed:wght@300;400;500;600;700&family=Barlow+Semi+Condensed:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: the 1920x720 radio screen as the hero, set in a dark bezel; a single control strip under it. Single dark look on purpose. */
+:root {
+  --bg: #0a0c0f;
+  --panel: #11151a;
+  --line: #222a32;
+  --fg: #d6e2e4;
+  --muted: #7d9095;
+  --cyan: #4ff0e6;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body {
+  font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: grid; gap: 4px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(22px, 3.2vw, 32px); letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+h1 span { color: var(--cyan); }
+header p { margin: 0; color: var(--muted); max-width: 72ch; }
+
+.bezel {
+  background: linear-gradient(180deg, #1b2026, #0e1114);
+  border: 1px solid var(--line); border-radius: 18px; padding: clamp(10px, 2.2vw, 26px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.screen {
+  position: relative; width: 100%; aspect-ratio: 290 / 109; max-width: 100%;
+  background: #000; border-radius: 4px; overflow: hidden; cursor: grab; touch-action: pan-y;
+}
+.screen:active { cursor: grabbing; }
+.screen canvas { display: block; width: 100%; height: 100%; }
+.screen .err { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); padding: 20px; text-align: center; }
+.cap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+.cap b { color: var(--cyan); font-weight: 500; }
+
+.controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.card h2 { margin: 0; font-family: var(--display); font-size: 14px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan); }
+.field { display: grid; gap: 6px; }
+.field label { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.field output { font-family: var(--mono); color: var(--cyan); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--cyan); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; }
+.row button { background: #0c1014; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.row button[aria-pressed=true] { border-color: var(--cyan); color: var(--cyan); background: #0d1d1d; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check input { accent-color: var(--cyan); width: 16px; height: 16px; }
+.note { color: var(--muted); font-size: 12.5px; margin: 0; max-width: 92ch; }
+.musicinfo { font-size: 13px; color: var(--muted); }
+.stIn { flex: 1 1 200px; min-width: 0; background: #0c1014; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 14px; }
+.stSel { width: auto; }
+.stList { display: grid; gap: 6px; max-height: 340px; overflow: auto; padding-right: 4px; }
+.stItem { display: flex; align-items: center; gap: 10px; text-align: left; background: #0c1014; color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; min-width: 0; }
+.stItem:hover, .stItem[aria-pressed=true] { border-color: var(--cyan); }
+.stItem img { width: 34px; height: 34px; object-fit: contain; background: #ffffff14; border-radius: 4px; flex: none; }
+.stItem .t { min-width: 0; display: grid; }
+.stItem .t b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stItem .t span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stRow { display: flex; gap: 6px; min-width: 0; }
+.stRow .stItem { flex: 1 1 auto; }
+.stFav { flex: none; width: 40px; background: #0c1014; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; font-size: 18px; cursor: pointer; }
+.stFav[aria-pressed=true] { color: var(--cyan); border-color: var(--cyan); }
+.stMore { justify-self: start; }
+#stTabs button[aria-pressed=true] { border-color: var(--cyan); color: var(--cyan); background: #0d1d1d; }
+.stCompare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; align-items: start; }
+.stCompare figure { margin: 0; display: grid; gap: 6px; }
+.stCompare img, .stCompare canvas { width: 100%; max-height: 140px; object-fit: contain; background: #000; border: 1px solid var(--line); border-radius: 6px; }
+.stCompare figcaption { font-size: 12px; color: var(--muted); }
+.musicinfo b { color: var(--fg); font-weight: 500; }
+.field small { color: var(--muted); font-size: 12px; }
+.trk { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; align-items: start; }
+.trk .preview { position: relative; width: 240px; aspect-ratio: 4 / 3; background: #000; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.trk .preview canvas { width: 100%; height: 100%; display: block; }
+.trk .preview span { position: absolute; left: 8px; bottom: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.trkgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+#trkStatus { font-family: var(--mono); font-size: 13px; color: var(--cyan); }
+@media (max-width: 700px) { .trk { grid-template-columns: 1fr; } .trkgrid { grid-template-columns: 1fr; } }
+.tunegrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 18px; }
+.tunegrid h3 { grid-column: 1 / -1; margin: 6px 0 0; font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+#tuneDump { margin: 0; padding: 10px 12px; background: #0c1014; border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 12px; color: var(--fg); white-space: pre-wrap; word-break: break-word; }
+[hidden] { display: none !important; }
+.bezel.pinned { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; box-shadow: 0 12px 30px rgba(0,0,0,0.6); }
+.toolbar { align-items: center; gap: 10px 14px; }
+.cardBody { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.fold { all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; }
+.fold:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 4px; }
+.chev { display: inline-block; transition: transform 0.15s ease; font-size: 12px; }
+.card.folded .chev { transform: rotate(-90deg); }
+.card.folded { padding-bottom: 14px; }
+/* short screens (a phone held sideways): keep the pinned screen to under half the height so the controls stay reachable */
+@media (max-height: 640px) {
+  .bezel.pinned { padding: 6px 8px; border-radius: 10px; }
+  .bezel.pinned .screen { width: min(100%, calc(48vh * 290 / 109)); margin: 0 auto; }
+  .bezel.pinned .cap { display: none; }
+}
+.zoomBar { position: absolute; right: 6px; bottom: 6px; z-index: 3; display: flex; align-items: center; gap: 4px; padding: 4px; background: rgba(0,0,0,0.6); border: 1px solid var(--line); border-radius: 8px; cursor: default; touch-action: manipulation; }
+.zoomBar button, .zoomBar select { background: #0c1014; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; font: 12px var(--body); padding: 4px 8px; min-width: 30px; cursor: pointer; }
+.zoomBar button[aria-pressed=true] { border-color: var(--cyan); color: var(--cyan); }
+.zoomBar output { font-family: var(--mono); font-size: 12px; color: var(--cyan); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+.screen.zoomed { touch-action: none; cursor: move; }
+.bezel .screen.big, .bezel.pinned .screen.big { position: fixed; z-index: 100; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100vw, calc(100vh * 290 / 109)); max-width: none; margin: 0; border-radius: 0; }
+body.bigview::after { content: ""; position: fixed; inset: 0; background: #000; z-index: 99; }
+body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
+@media (max-width: 900px) { .controls { grid-template-columns: 1fr; } .tunegrid { grid-template-columns: 1fr; } }
+/* ---------- Pi speed test overlay (test version only) ---------- */
+.piHud { position: absolute; left: 6px; top: 6px; z-index: 4; max-width: 360px; padding: 6px 8px; background: rgba(0,0,0,0.78); border: 1px solid var(--line); border-radius: 8px; font: 12px var(--mono); color: var(--fg); cursor: default; touch-action: manipulation; }
+.piHud .fps { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.piHud .fps b { font-size: 22px; color: var(--cyan); font-variant-numeric: tabular-nums; }
+.piHud .fps .bad { color: #ff6b6b; } .piHud .fps .ok { color: #ffd166; }
+.piHud .meta { color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.piHud .grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; margin-top: 6px; }
+.piHud select, .piHud button { background: #0c1014; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; font: 12px var(--body); padding: 3px 6px; cursor: pointer; }
+.piHud .row2 { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.piHud.collapsed .grid, .piHud.collapsed .row2 { display: none; }
+.piHud .changed { border-color: #ffd166; color: #ffd166; }
+.bezel .screen.big.fixedSize, .bezel.pinned .screen.big.fixedSize { aspect-ratio: auto; max-width: none; max-height: none; }
+body.bigview .bezel, body.bigview .bezel.pinned { background: transparent; border-color: transparent; box-shadow: none; }
+body.bigview .bezel .cap { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>RADIO <span>3D SCREEN</span></h1>
+    <p>A prototype of the radio's 12.3" screen drawn as a live 3D scene. Move your pointer over it, or drag, to see it from different angles. The screen acts like a window into a shallow box, so the cubes and letters shift against each other the way real objects would.</p>
+  </header>
+
+  <div class="bezel pinned" id="bezel">
+    <div class="screen" id="screen"><canvas id="gl" aria-label="3D radio screen with cube equalizer, station name and logo"></canvas>
+      <div class="zoomBar" role="group" aria-label="Zoom">
+        <select id="zPreset" aria-label="Zoom to">
+          <option value="full">Whole screen</option><option value="eq">EQ</option><option value="tops">EQ top pieces</option>
+          <option value="hz">Hz strip</option><option value="title">Station name</option><option value="logo">Logo</option>
+          <option value="info">Info text</option><option value="play">Play icon</option>
+        </select>
+        <button type="button" id="zOut" aria-label="Zoom out">−</button>
+        <output id="zLbl">1×</output>
+        <button type="button" id="zIn" aria-label="Zoom in">+</button>
+        <button type="button" id="zBig" aria-pressed="false">Big view</button>
+      </div>
+      <div class="piHud" id="piHud" role="group" aria-label="Pi speed test">
+        <div class="fps"><span>FPS <b id="piFps">--</b></span><span>10 s avg <b id="piAvg" style="font-size:16px">--</b></span><button type="button" id="piFold" aria-expanded="true">Hide switches</button></div>
+        <div class="meta" id="piMeta">measuring…</div>
+        <div class="grid">
+          <label for="piGlow">Glow</label>
+          <select id="piGlow"><option value="full">Full (original)</option><option value="half">Lighter (half size)</option><option value="off">Off</option></select>
+          <label for="piLayers">3D text layers</label>
+          <select id="piLayers"><option value="full">Full (original)</option><option value="fewer">Fewer (max 4)</option><option value="single">Single</option></select>
+          <label for="piGhosts">Ghosts</label>
+          <select id="piGhosts"><option value="on">On (original)</option><option value="off">Off</option></select>
+          <label for="piScale">Drawing size</label>
+          <select id="piScale"><option value="1">100% (original)</option><option value="0.75">75%</option><option value="0.5">50%</option></select>
+          <label for="piSkip">Skip repeat work</label>
+          <select id="piSkip"><option value="0">Off (original)</option><option value="1">On</option></select>
+          <label for="piAa">Edge smoothing</label>
+          <select id="piAa"><option value="1">On (original)</option><option value="0">Off (reloads)</option></select>
+          <label for="piHdr">Glow precision</label>
+          <select id="piHdr"><option value="1">High (original)</option><option value="0">Standard (reloads)</option></select>
+          <label for="piView">View</label>
+          <select id="piView"><option value="lock">Centre, locked</option><option value="mouse">Follow mouse</option></select>
+          <label for="piSize">Big view size</label>
+          <select id="piSize"><option value="real">Exactly 1920 × 720</option><option value="fill">Fill the window</option></select>
+        </div>
+        <div class="row2"><button type="button" id="piReset">Reset all to original</button></div>
+      </div>
+    </div>
+    <div class="cap"><span>1920 × 720 · 290 × 109 mm</span><span id="eyeOut"><b>Viewer</b> centre</span></div>
+  </div>
+
+  <div class="row toolbar">
+    <button type="button" id="foldAll">Collapse all panels</button>
+    <button type="button" id="openAll">Expand all panels</button>
+    <label class="check"><input type="checkbox" id="pinScreen" checked> Keep the screen pinned at the top while scrolling</label>
+  </div>
+
+  <section class="card" aria-labelledby="h-trk">
+    <h2 id="h-trk">Head tracking</h2>
+    <div class="trk">
+      <div style="display:grid; gap:12px; min-width:0">
+        <div class="row">
+          <button type="button" id="trkBtn">Start head tracking</button>
+        </div>
+        <div id="trkStatus">Off. Click the button and allow the webcam. Everything runs on this computer; nothing is recorded or sent anywhere.</div>
+        <div class="trkgrid">
+          <div class="field">
+            <label for="cWidth">Width of the radio screen on your monitor <output id="cWidthOut"></output></label>
+            <input type="range" id="cWidth" min="150" max="900" step="5">
+            <small>Hold a ruler to the black screen area above and set this to match.</small>
+          </div>
+          <div class="field">
+            <label for="cAbove">Webcam height above the screen's centre <output id="cAboveOut"></output></label>
+            <input type="range" id="cAbove" min="0" max="500" step="5" value="0">
+          </div>
+          <div class="field">
+            <label for="cGain">Effect strength <output id="cGainOut"></output></label>
+            <input type="range" id="cGain" min="0.3" max="2" step="0.05" value="1">
+            <small>1.0 is physically correct. Higher exaggerates the movement.</small>
+          </div>
+          <div class="field">
+            <label for="cSmooth">Smoothing <output id="cSmoothOut"></output></label>
+            <input type="range" id="cSmooth" min="0" max="1" step="0.05" value="1">
+            <small>More smoothing means less jitter but a little more lag.</small>
+          </div>
+        </div>
+      </div>
+      <div class="preview"><canvas id="trkCanvas" width="320" height="240"></canvas><span>Webcam preview</span></div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-st">
+    <h2 id="h-st">Real stations</h2>
+    <small class="note">Searches the free Radio Browser directory of internet stations worldwide (needs an internet connection). Pick one to hear it and see how its real logo comes out on the radio. Tap ☆ to keep a station in Favourites.</small>
+    <div class="row">
+      <input class="stIn" id="stQ" type="search" value="synthwave" placeholder="Station name or genre" aria-label="Station name or genre">
+      <select class="stSel" id="stBy" aria-label="Search by"><option value="tag">Genre</option><option value="name">Name</option></select>
+      <select class="stSel" id="stCountry" aria-label="Country"><option value="">Any country</option><option value="US" selected>United States</option></select>
+      <select class="stSel" id="stLang" aria-label="Language"><option value="">Any language</option></select>
+      <button type="button" id="stGo">Search</button>
+    </div>
+    <div class="row" id="stTabs" role="group" aria-label="Station lists">
+      <button type="button" id="stTop">Top stations</button>
+      <button type="button" id="stFavs">Favourites</button>
+    </div>
+    <div class="row" id="stQuick" role="group" aria-label="Quick searches">
+      <button type="button" data-q="synthwave" data-by="tag">Synthwave</button>
+      <button type="button" data-q="SomaFM" data-by="name">SomaFM</button>
+      <button type="button" data-q="KEXP" data-by="name">KEXP</button>
+      <button type="button" data-q="jazz" data-by="tag">Jazz</button>
+      <button type="button" data-q="news" data-by="tag">News</button>
+      <button type="button" data-q="classical" data-by="tag">Classical</button>
+    </div>
+    <div class="field">
+      <label for="stLogoStyle">Logo style</label>
+      <select id="stLogoStyle">
+        <option value="auto">Automatic (silhouette, or the name if the image is unusable)</option>
+        <option value="sil">Silhouette</option>
+        <option value="detail">Detailed (keeps inner shading)</option>
+        <option value="text">Station name as text</option>
+      </select>
+    </div>
+    <div class="musicinfo" id="stStatus">Search, then pick a station.</div>
+    <div class="stCompare">
+      <figure><img id="stOrig" alt="The station's own logo"><figcaption>Station's own logo</figcaption></figure>
+      <figure><canvas id="stArt" width="520" height="220"></canvas><figcaption>Converted for the radio</figcaption></figure>
+    </div>
+    <div class="stList" id="stList"></div>
+    <div class="row"><button type="button" class="stMore" id="stMore" hidden>Show more</button></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-music">
+    <h2 id="h-music">Music</h2>
+    <div class="row" role="group" aria-label="Audio source">
+      <button type="button" id="pickBtn">Choose a music file</button>
+      <input type="file" id="file" accept="audio/*" hidden>
+      <button type="button" id="clickBtn">Sync test beat</button>
+      <button type="button" id="playBtn" disabled>Play</button>
+      <button type="button" id="demoBtn" aria-pressed="true">Demo animation</button>
+    </div>
+    <div class="musicinfo" id="trackOut">Demo animation running. Pick a song from your computer to drive the EQ with real audio. The file plays here in your browser and isn't uploaded anywhere.</div>
+    <div class="field">
+      <label for="sync">Sync adjustment <output id="syncOut"></output></label>
+      <input type="range" id="sync" min="-200" max="200" step="5" value="0">
+      <small id="latOut">Starts once audio plays.</small>
+    </div>
+  </section>
+
+  <div class="controls">
+    <section class="card" aria-labelledby="h-view">
+      <h2 id="h-view">Viewpoint</h2>
+      <label class="check"><input type="checkbox" id="drift"> Slow drift when idle</label>
+      <div class="row" role="group" aria-label="Viewpoints">
+        <button type="button" id="vHead">Head-on</button>
+        <button type="button" id="vLeft">From the left</button>
+        <button type="button" id="vAbove">From above</button>
+      </div>
+      <div class="field">
+        <label for="dist">Viewing distance <output id="distOut"></output></label>
+        <input type="range" id="dist" min="300" max="1200" step="10" value="550">
+      </div>
+    </section>
+    <section class="card" aria-labelledby="h-look">
+      <h2 id="h-look">Look</h2>
+      <div class="field">
+        <label for="depth">Depth <output id="depthOut"></output></label>
+        <input type="range" id="depth" min="0.3" max="2.5" step="0.05" value="1">
+      </div>
+      <div class="field">
+        <label for="eqH">EQ piece height (thickness) <output id="eqHOut"></output></label>
+        <input type="range" id="eqH" min="0.5" max="4" step="0.1" value="1.9">
+        <small>Taller pieces make taller bars. The gap slider sets the space between pieces.</small>
+      </div>
+      <div class="field">
+        <label for="eqGap">Gap between EQ pieces <output id="eqGapOut"></output></label>
+        <input type="range" id="eqGap" min="0.5" max="3.2" step="0.1" value="3.2">
+      </div>
+      <div class="field">
+        <label for="eqW">EQ piece width <output id="eqWOut"></output></label>
+        <input type="range" id="eqW" min="3" max="10.5" step="0.1" value="6.9">
+      </div>
+      <div class="field">
+        <label for="eqD">EQ piece depth <output id="eqDOut"></output></label>
+        <input type="range" id="eqD" min="1" max="25" step="0.5" value="5.5">
+        <small>Thicker pieces show more of their sides and tops as you move.</small>
+      </div>
+      <label class="check"><input type="checkbox" id="showUnlit"> Show unlit EQ pieces as clear acrylic</label>
+      <div class="field">
+        <label for="glow">Glow <output id="glowOut"></output></label>
+        <input type="range" id="glow" min="0" max="2" step="0.05" value="0.7">
+      </div>
+    </section>
+    <section class="card" aria-labelledby="h-depth">
+      <h2 id="h-depth">Depth cues</h2>
+      <label class="check"><input type="checkbox" id="refl"> Reflections on the floor</label>
+      <label class="check"><input type="checkbox" id="room"> Faint box walls and back grid</label>
+      <label class="check"><input type="checkbox" id="frame" checked> Cyan outline on the glass</label>
+      <label class="check"><input type="checkbox" id="ghosts" checked> Ghost echoes behind the EQ and text</label>
+      <div class="field">
+        <label for="gGap">Ghost spacing <output id="gGapOut"></output></label>
+        <input type="range" id="gGap" min="3" max="60" step="0.5" value="54">
+      </div>
+      <div class="field">
+        <label for="gBright">Ghost brightness <output id="gBrightOut"></output></label>
+        <input type="range" id="gBright" min="0" max="2" step="0.05" value="0.75">
+        <small>At 1.0 the two ghosts are about 40% and 16% as bright as the front, like your game footage.</small>
+      </div>
+      <div class="field">
+        <label for="gTint">Ghost colour: white ↔ cyan <output id="gTintOut"></output></label>
+        <input type="range" id="gTint" min="0" max="1" step="0.05" value="1">
+        <small>In the game the ghosts lose their white and turn cyan as they fade.</small>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="h-layers">
+    <h2 id="h-layers">Layers</h2>
+    <small class="note">Front layer, on the glass, never moves: cyan lines, play/pause, station logo, the Hz labels and the side marker dots, plus a dark band behind the Hz labels that hides the bottom of the bars. EQ layer: the spectrum, sitting behind the front layer. Ghosts of front elements still fan out behind them.</small>
+    <div class="tunegrid">
+      <div class="field"><label for="lMid">Hz labels and side dots: depth behind the glass <output id="lMidOut"></output></label>
+        <input type="range" id="lMid" data-layer="mid" min="0" max="30" step="0.5"></div>
+      <div class="field"><label for="lEq">EQ layer depth <output id="lEqOut"></output></label>
+        <input type="range" id="lEq" data-layer="eq" min="0" max="40" step="0.5"></div>
+      <div class="field"><label for="lOverlap">How much the Hz strip covers the bars <output id="lOverlapOut"></output></label>
+        <input type="range" id="lOverlap" data-layer="overlap" min="0" max="10" step="0.5"></div>
+      <h3>Which layer each element sits on</h3>
+      <div class="field"><label for="eTitle">Station name and NOW PLAYING</label>
+        <select id="eTitle" data-elem="title"><option value="front">Front (on the glass)</option><option value="mid">Hz strip layer</option><option value="eq">EQ layer</option></select></div>
+      <div class="field"><label for="eInfo">Info text</label>
+        <select id="eInfo" data-elem="info"><option value="front">Front (on the glass)</option><option value="mid">Hz strip layer</option><option value="eq">EQ layer</option></select></div>
+      <div class="field"><label for="eLogo">Station logo</label>
+        <select id="eLogo" data-elem="logo"><option value="front">Front (on the glass)</option><option value="mid">Hz strip layer</option><option value="eq">EQ layer</option></select></div>
+      <div class="field"><label for="ePlay">Play / pause icon</label>
+        <select id="ePlay" data-elem="play"><option value="front">Front (on the glass)</option><option value="mid">Hz strip layer</option><option value="eq">EQ layer</option></select></div>
+      <h3>Which elements have ghosts</h3>
+      <label class="check"><input type="checkbox" data-ghost="eq"> EQ</label>
+      <label class="check"><input type="checkbox" data-ghost="mid"> Hz labels and side markers</label>
+      <label class="check"><input type="checkbox" data-ghost="title"> Station name and NOW PLAYING</label>
+      <label class="check"><input type="checkbox" data-ghost="info"> Info text</label>
+      <label class="check"><input type="checkbox" data-ghost="logo"> Station logo</label>
+      <label class="check"><input type="checkbox" data-ghost="play"> Play / pause icon</label>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-tune">
+    <h2 id="h-tune">Fine-tune to match the game</h2>
+    <div class="tunegrid">
+      <h3>EQ pieces</h3>
+      <div class="field"><label for="tTopCount">Bright top pieces per bar <output id="tTopCountOut"></output></label>
+        <input type="range" id="tTopCount" data-tune="topCount" min="0" max="4" step="1"></div>
+      <div class="field"><label for="tTopWhite">Top pieces: white vs cyan <output id="tTopWhiteOut"></output></label>
+        <input type="range" id="tTopWhite" data-tune="topWhite" min="0" max="1" step="0.05">
+        <small>0 is pure cyan, 1 is pure white. The game looks like white with a cyan tint.</small></div>
+      <div class="field"><label for="tTopBright">Top pieces: brightness <output id="tTopBrightOut"></output></label>
+        <input type="range" id="tTopBright" data-tune="topBright" min="0.5" max="2.5" step="0.05"></div>
+      <div class="field"><label for="tEqBright">Other lit pieces: brightness <output id="tEqBrightOut"></output></label>
+        <input type="range" id="tEqBright" data-tune="eqBright" min="0.3" max="2" step="0.05"></div>
+      <div class="field"><label for="tEdge">Edge highlight on lit pieces <output id="tEdgeOut"></output></label>
+        <input type="range" id="tEdge" data-tune="edge" min="0" max="1.5" step="0.05">
+        <small>0 lights each piece evenly with no brighter rim. Higher makes the edges glow like real edge-lit acrylic.</small></div>
+      <label class="check"><input type="checkbox" id="tPeaks" data-tune="peaks"> Floating peak caps above the bars</label>
+      <h3>Fonts</h3>
+      <div class="field"><label for="fTitle">Station name and NOW PLAYING font</label>
+        <select id="fTitle" data-font="title"><option>Rajdhani</option><option>Chakra Petch</option><option>Saira Semi Condensed</option><option>Barlow Semi Condensed</option></select></div>
+      <div class="field"><label for="fTitleW">Station name weight</label>
+        <select id="fTitleW" data-font="titleW"><option value="300">Light</option><option value="400">Regular</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option></select></div>
+      <div class="field"><label for="fNpW">NOW PLAYING weight</label>
+        <select id="fNpW" data-font="npW"><option value="300">Light</option><option value="400">Regular</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option></select></div>
+      <div class="field"><label for="fHz">Hz labels font</label>
+        <select id="fHz" data-font="hz"><option>Rajdhani</option><option>Chakra Petch</option><option>Saira Semi Condensed</option><option>Barlow Semi Condensed</option><option>IBM Plex Mono</option></select></div>
+      <div class="field"><label for="fHzW">Hz labels weight (boldness)</label>
+        <select id="fHzW" data-font="hzW"><option value="300">Light</option><option value="400">Regular</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option></select></div>
+      <h3>Other elements</h3>
+      <div class="field"><label for="tOutline">Cyan outline lights <output id="tOutlineOut"></output></label>
+        <input type="range" id="tOutline" data-tune="outline" min="0.3" max="3" step="0.05"></div>
+      <div class="field"><label for="tOutlineCyan">Cyan outline lights: white vs cyan <output id="tOutlineCyanOut"></output></label>
+        <input type="range" id="tOutlineCyan" data-tune="outlineCyan" min="0" max="1" step="0.05"></div>
+      <div class="field"><label for="tLogo">Station logo <output id="tLogoOut"></output></label>
+        <input type="range" id="tLogo" data-tune="logo" min="0.3" max="2.5" step="0.05"></div>
+      <div class="field"><label for="tLogoCyan">Station logo: white vs cyan <output id="tLogoCyanOut"></output></label>
+        <input type="range" id="tLogoCyan" data-tune="logoCyan" min="0" max="1" step="0.05"></div>
+      <div class="field"><label for="tPlay">Play / pause icon <output id="tPlayOut"></output></label>
+        <input type="range" id="tPlay" data-tune="play" min="0.3" max="2.5" step="0.05"></div>
+      <div class="field"><label for="tPlayCyan">Play / pause icon: white vs cyan <output id="tPlayCyanOut"></output></label>
+        <input type="range" id="tPlayCyan" data-tune="playCyan" min="0" max="1" step="0.05"></div>
+      <div class="field"><label for="tTitle">Station name and NOW PLAYING <output id="tTitleOut"></output></label>
+        <input type="range" id="tTitle" data-tune="title" min="0.3" max="2.5" step="0.05"></div>
+      <div class="field"><label for="tInfo">Info text <output id="tInfoOut"></output></label>
+        <input type="range" id="tInfo" data-tune="info" min="0.2" max="2" step="0.05"></div>
+      <div class="field"><label for="tInfoCyan">Info text: white vs cyan <output id="tInfoCyanOut"></output></label>
+        <input type="range" id="tInfoCyan" data-tune="infoCyan" min="0" max="1" step="0.05">
+        <small>The text above the logo. 1 is pure cyan, like the game.</small></div>
+      <div class="field"><label for="tLabels">Frequency labels <output id="tLabelsOut"></output></label>
+        <input type="range" id="tLabels" data-tune="labels" min="0.2" max="2" step="0.05"></div>
+    </div>
+    <div class="row"><button type="button" id="tuneCopy">Copy my settings</button></div>
+    <pre id="tuneDump" hidden></pre>
+  </section>
+
+  <p class="note">This copy runs on your own computer so it can use your webcam for head tracking. When no face is found, it falls back to the slow drift. Head tracking is right for one viewer: close one eye for the strongest effect. With music playing, bass bands use a 2048-point analysis and treble bands a faster 512-point one, so hits stay snappy. Bars jump up instantly and fall back slowly. The station, song text and logo are placeholders, not the game's. Built with three.js, which can run full-screen on the Pi 5.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/MaskPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const screenEl = $('screen'), canvas = $('gl');
+
+  // ---------- Pi speed test switches (test version only; every default = the original page) ----------
+  const PQ = new URLSearchParams(location.search);
+  const pick = (k, ok, d) => { const v = PQ.get(k); return ok.includes(v) ? v : d; };
+  const PI = {
+    glow: pick('glow', ['full', 'half', 'off'], 'full'),
+    layers: pick('layers', ['full', 'fewer', 'single'], 'full'),
+    ghosts: pick('ghosts', ['on', 'off'], 'on'),
+    scale: pick('scale', ['1', '0.75', '0.5'], '1'),
+    skip: pick('skip', ['0', '1'], '0'),
+    aa: pick('aa', ['1', '0'], '1'),
+    hdr: pick('hdr', ['1', '0'], '1'),
+    view: pick('view', ['lock', 'mouse'], 'lock'),
+    size: pick('size', ['real', 'fill'], 'real'),
+  };
+  const PI_DEFAULT = { glow: 'full', layers: 'full', ghosts: 'on', scale: '1', skip: '0', aa: '1', hdr: '1', view: 'lock', size: 'real' };
+  const PI_RELOAD = ['aa', 'hdr'];   // these can only change when the 3D engine starts
+  function piSaveUrl() {
+    const q = new URLSearchParams();
+    Object.keys(PI).forEach(k => { if (PI[k] !== PI_DEFAULT[k]) q.set(k, PI[k]); });
+    const s = q.toString();
+    history.replaceState(null, '', location.pathname + (s ? '?' + s : ''));
+  }
+
+  if (!window.THREE) { screenEl.insertAdjacentHTML('beforeend', '<div class="err">The 3D library did not load. Check your connection and reload the page.</div>'); return; }
+
+  const SW = 290, SH = 109;          // screen size in mm; scene units are mm
+  const FLOOR = -41;
+  const CY = new THREE.Color(0.31, 0.94, 0.90);
+
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: PI.aa === '1' }); }
+  catch (e) { screenEl.insertAdjacentHTML('beforeend', '<div class="err">This browser could not start 3D graphics (WebGL).</div>'); return; }
+  renderer.setClearColor(0x000000, 1);
+  renderer.info.autoReset = false;   // test version: count draw calls for the whole frame, glow passes included
+
+  const scene = new THREE.Scene();
+  const world = new THREE.Group(); scene.add(world);
+  const cam = new THREE.PerspectiveCamera(30, SW / SH, 5, 3000);
+  cam.matrixAutoUpdate = true;
+
+  // ---------- helpers ----------
+  const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  function extruded(canvas, wMM, hMM, slices, depth, sideMul) {
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const geo = new THREE.PlaneGeometry(wMM, hMM);
+    const g = new THREE.Group();
+    for (let i = slices - 1; i >= 0; i--) {
+      const f = i === 0 ? 1 : sideMul * (1 - 0.55 * i / slices);
+      const col = i === 0 ? new THREE.Color(0.75, 1.0, 0.98) : CY.clone().multiplyScalar(f);
+      const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.35, color: col });
+      const mesh = new THREE.Mesh(geo, m);
+      mesh.position.z = -i * depth / slices;
+      g.add(mesh);
+    }
+    g.userData.tex = tex;
+    return g;
+  }
+  function textCanvas(text, px, font, pad = 8) {
+    const c = mkCanvas(8, 8), g = c.getContext('2d');
+    g.font = `${font}`.replace('{px}', px + 'px');
+    const w = Math.ceil(g.measureText(text).width) + pad * 2;
+    c.width = w; c.height = Math.ceil(px * 1.3);
+    const g2 = c.getContext('2d');
+    g2.font = `${font}`.replace('{px}', px + 'px');
+    g2.fillStyle = '#fff'; g2.textBaseline = 'middle';
+    g2.fillText(text, pad, c.height / 2 + px * 0.04);
+    return c;
+  }
+  // title and Hz fonts are adjustable; Rajdhani is a light, condensed face close to the game's UI type
+  const FONTCFG = { title: 'Rajdhani', titleW: 500, npW: 600, hz: 'Rajdhani', hzW: 700 };
+  let FONT_D, FONT_D6;
+  function updateFontStrings() {
+    FONT_D = `${FONTCFG.titleW} {px} "${FONTCFG.title}", sans-serif`;
+    FONT_D6 = `${FONTCFG.npW} {px} "${FONTCFG.title}", sans-serif`;
+  }
+  updateFontStrings();
+  const FONT_M = '500 {px} "IBM Plex Mono", monospace';
+
+  // ---------- EQ cubes (instanced, custom shading) ----------
+  const BANDS = 11, SEGS = 12, PITCH_X = 11.2, CUBE_W = 7.6, CUBE_H = 2.4, CUBE_D = 6, PITCH_Y = 4;
+  const EQ_X0 = -130, EQ_Y0 = -40, EQ_Z = -16;
+  // brightness and colour tunables (1 = neutral); defaults follow the game footage
+  const TUNE = { topCount: 2, topWhite: 0.1, topBright: 1.65, eqBright: 1.0, edge: 0.35, peaks: false,
+                 outline: 3, logo: 0.65, play: 2.5, title: 1.0, info: 1.5, infoCyan: 0.95, labels: 1.85, outlineCyan: 0.8, logoCyan: 0.3, playCyan: 0.8 };
+  const cubeGeo = new THREE.BoxGeometry(CUBE_W, CUBE_H, CUBE_D);
+  const colors = new Float32Array(BANDS * SEGS * 3);
+  const colorAttr = new THREE.InstancedBufferAttribute(colors, 3);
+  colorAttr.setUsage(THREE.DynamicDrawUsage);
+  cubeGeo.setAttribute('aColor', colorAttr);
+
+  // Each segment is a separate acrylic piece: clear when off, glowing from inside when on,
+  // with light gathering at its edges the way edge-lit acrylic does.
+  const cubeVS = `
+    attribute vec3 aColor;
+    varying vec3 vColor; varying vec3 vLocal; varying vec3 vWN; varying vec3 vWP; varying float vY;
+    void main() {
+      vColor = aColor; vLocal = position;
+      vec4 p = vec4(position, 1.0);
+      vec3 n = normal;
+      #ifdef USE_INSTANCING
+        p = instanceMatrix * p;
+        n = mat3(instanceMatrix) * n;
+      #endif
+      vec4 wp = modelMatrix * p;
+      vWP = wp.xyz; vY = wp.y;
+      vWN = normalize(mat3(modelMatrix) * n);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`;
+  const cubeFS = `
+    uniform float uBoost; uniform float uFade; uniform float uFloor; uniform vec3 uHalf; uniform float uUnlit; uniform float uEdge; uniform float uCyan;
+    varying vec3 vColor; varying vec3 vLocal; varying vec3 vWN; varying vec3 vWP; varying float vY;
+    void main() {
+      vec3 d = max(uHalf - abs(vLocal), 0.0);
+      float lo = min(d.x, min(d.y, d.z)), hi = max(d.x, max(d.y, d.z));
+      float e = d.x + d.y + d.z - lo - hi;            // distance to the nearest edge of this face
+      float edge = exp(-e / 0.26);
+      vec3 V = normalize(cameraPosition - vWP);
+      vec3 N = normalize(vWN);
+      float fres = pow(1.0 - abs(dot(N, V)), 3.0);
+      float lum = max(max(vColor.r, vColor.g), vColor.b);
+      float lit = smoothstep(0.15, 0.4, lum);
+      float faceGain = abs(N.z) > 0.5 ? 0.42 : (N.y > 0.5 ? 0.62 : (N.y < -0.5 ? 0.1 : 0.2));
+      vec3 tint = vec3(0.31, 0.94, 0.90);
+      vec3 glow = vColor * faceGain + mix(vColor, vec3(0.9, 1.0, 1.0), 0.5) * edge * 0.75 * uEdge;
+      float spec = pow(max(dot(reflect(-V, N), normalize(vec3(-0.35, 0.6, 0.72))), 0.0), 48.0);
+      vec3 clear = tint * (0.09 * edge + 0.05 * fres) + vec3(0.8, 1.0, 1.0) * spec * 0.22;
+      vec3 col = mix(clear * uUnlit, glow, lit) + tint * fres * 0.06 * lit;
+      float f = 1.0;
+      if (uFade > 0.5) f = clamp(1.0 - (uFloor - vY) / 20.0, 0.0, 1.0);
+      float pk = max(max(col.r, col.g), col.b);
+      col = mix(col, tint * pk, uCyan);           // ghosts: recolour toward cyan, keep brightness
+      gl_FragColor = vec4(col * uBoost * f, 1.0);
+    }`;
+  const edgeU = { value: 0.35 };  // bright rim on lit pieces: 0 = none, 1 = strong
+  const unlitU = { value: 0 };   // 0 = unlit pieces invisible, 1 = shown as clear acrylic
+  const half = new THREE.Vector3(CUBE_W / 2, CUBE_H / 2, CUBE_D / 2);
+  const glassOpts = { vertexShader: cubeVS, fragmentShader: cubeFS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide };
+  const cubeMat = new THREE.ShaderMaterial(Object.assign({ uniforms: { uBoost: { value: 1 }, uFade: { value: 0 }, uFloor: { value: FLOOR }, uHalf: { value: half }, uUnlit: unlitU, uEdge: edgeU, uCyan: { value: 0 } } }, glassOpts));
+  const reflMat = new THREE.ShaderMaterial(Object.assign({ uniforms: { uBoost: { value: 0.3 }, uFade: { value: 1 }, uFloor: { value: FLOOR }, uHalf: { value: half }, uUnlit: unlitU, uEdge: edgeU, uCyan: { value: 0 } } }, glassOpts));
+  const eq = new THREE.InstancedMesh(cubeGeo, cubeMat, BANDS * SEGS);
+  const m4 = new THREE.Matrix4();
+  const qI = new THREE.Quaternion(), vP = new THREE.Vector3(), vS = new THREE.Vector3();
+  let eqPitch = PITCH_Y;
+  const EQ_DIM = { gap: 3.2, h: 1.9, w: 6.9, d: 5.5 };   // mm: gap between pieces in a bar, piece width, piece depth
+  function layoutEQ() {
+    const h = EQ_DIM.h, w = EQ_DIM.w, d = EQ_DIM.d;
+    eqPitch = h + EQ_DIM.gap;
+    for (let i = 0; i < BANDS; i++) for (let j = 0; j < SEGS; j++) {
+      vP.set(EQ_X0 + i * PITCH_X, EQ_Y0 + j * eqPitch + h / 2, EQ_Z - d / 2);
+      vS.set(w / CUBE_W, h / CUBE_H, d / CUBE_D);
+      m4.compose(vP, qI, vS);
+      eq.setMatrixAt(i * SEGS + j, m4);
+    }
+    eq.instanceMatrix.needsUpdate = true;
+  }
+  layoutEQ();
+  eq.frustumCulled = false;
+  world.add(eq);
+  const refl = new THREE.InstancedMesh(cubeGeo, reflMat, BANDS * SEGS);
+  refl.instanceMatrix = eq.instanceMatrix;
+  refl.scale.y = -1; refl.position.y = 2 * FLOOR + 2 * 0.0 - 1.0;
+  refl.frustumCulled = false;
+  world.add(refl);
+
+  // ---------- floor, back wall, box ----------
+  const floorC = mkCanvas(512, 128), fg = floorC.getContext('2d');
+  fg.fillStyle = '#000'; fg.fillRect(0, 0, 512, 128);
+  fg.strokeStyle = 'rgba(79,240,230,0.22)'; fg.lineWidth = 1;
+  for (let x = 0; x <= 512; x += 16) { fg.beginPath(); fg.moveTo(x + 0.5, 0); fg.lineTo(x + 0.5, 128); fg.stroke(); }
+  for (let y = 0; y <= 128; y += 16) { fg.beginPath(); fg.moveTo(0, y + 0.5); fg.lineTo(512, y + 0.5); fg.stroke(); }
+  const floorTex = new THREE.CanvasTexture(floorC);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(SW, 60), new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, opacity: 0.6, depthWrite: false }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(0, FLOOR - 0.3, -30);
+  world.add(floor);
+
+  const backC = mkCanvas(1024, 384), bg = backC.getContext('2d');
+  bg.fillStyle = '#000'; bg.fillRect(0, 0, 1024, 384);
+  bg.fillStyle = 'rgba(79,240,230,0.13)';
+  for (let y = 6; y < 384; y += 12) for (let x = 6 + ((y / 12) % 2) * 6; x < 1024; x += 12) { bg.beginPath(); bg.arc(x, y, 1.6, 0, Math.PI * 2); bg.fill(); }
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(backC) }));
+  back.position.z = -60;
+  world.add(back);
+
+  const boxPts = [];
+  const hw = SW / 2, hh = SH / 2;
+  [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([x, y]) => boxPts.push(x, y, 0, x, y, -60));
+  [-20, -40].forEach(z => { boxPts.push(-hw, -hh, z, hw, -hh, z, hw, -hh, z, hw, hh, z, hw, hh, z, -hw, hh, z, -hw, hh, z, -hw, -hh, z); });
+  const boxGeo = new THREE.BufferGeometry(); boxGeo.setAttribute('position', new THREE.Float32BufferAttribute(boxPts, 3));
+  const box = new THREE.LineSegments(boxGeo, new THREE.LineBasicMaterial({ color: 0x1f6f6b, transparent: true, opacity: 0.5 }));
+  world.add(box);
+  const roomGroup = [back, box, floor];
+
+  // ---------- text & logo ----------
+  const npC = textCanvas('NOW PLAYING', 64, FONT_D6);
+  const npH = 6.5, npW = npH * npC.width / npC.height;
+  const nowPlaying = extruded(npC, npW, npH, 8, 2.5, 0.55);
+  nowPlaying.position.set(-24 - npW / 2, 44, -6);
+  world.add(nowPlaying);
+
+  let mqText = 'NEON DRIFT  ·  97.1 FM  ·  MIDNIGHT FREQUENCIES  ·  ';
+  const mqC = textCanvas(mqText, 120, FONT_D, 0);
+  const MQ_H = 15, MQ_W = 112;
+  let mqTextW = MQ_H * mqC.width / mqC.height;
+  const marquee = extruded(mqC, MQ_W, MQ_H, 16, 6, 0.55);
+  marquee.userData.tex.wrapS = THREE.RepeatWrapping;
+  marquee.userData.tex.repeat.x = MQ_W / mqTextW;
+  marquee.position.set(-136 + MQ_W / 2, 30, -10);
+  world.add(marquee);
+
+  // band labels (flat)
+  const lbC = mkCanvas(2048, 64), lg = lbC.getContext('2d');
+  lg.fillStyle = '#fff'; lg.font = '500 34px "IBM Plex Mono", monospace'; lg.textAlign = 'center'; lg.textBaseline = 'middle';
+  const BL = ['40HZ','100HZ','300HZ','600HZ','1KHZ','2KHZ','4KHZ','6KHZ','9KHZ','12KHZ','16KHZ'];
+  const lbW = BANDS * PITCH_X;
+  BL.forEach((b, i) => lg.fillText(b, (i + 0.5) / BANDS * 2048, 34));
+  const labels = new THREE.Mesh(new THREE.PlaneGeometry(lbW, lbW * 64 / 2048), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(lbC), transparent: true, color: CY.clone().multiplyScalar(0.8), depthWrite: false }));
+  labels.position.set(EQ_X0 - PITCH_X / 2 + lbW / 2, EQ_Y0 - 5, EQ_Z + 2);
+  world.add(labels);
+
+  function drawLabels() {
+    lg.clearRect(0, 0, 2048, 64);
+    lg.fillStyle = '#fff'; lg.textAlign = 'center'; lg.textBaseline = 'middle';
+    lg.font = `${FONTCFG.hzW} 36px "${FONTCFG.hz}", monospace`;
+    BL.forEach((b, i) => lg.fillText(b, (i + 0.5) / BANDS * 2048, 34));
+    labels.material.map.needsUpdate = true;
+  }
+
+  // info lines
+  const infoC = mkCanvas(1024, 200), ig = infoC.getContext('2d');
+  ig.fillStyle = '#fff'; ig.font = '500 34px "IBM Plex Mono", monospace'; ig.textBaseline = 'top';
+  ['IMAGE NAME:   NIGHTJAR-4.2.0', 'IMAGE TYPE:   ARM64 KERNEL IMAGE', '(LZ4 COMPRESSED)', 'LOAD ADDRESS: 0x00080000'].forEach((l, i) => ig.fillText(l, 4, 6 + i * 48));
+  const info = extruded(infoC, 88, 88 * 200 / 1024, 4, 1.2, 0.5);
+  info.position.set(6 + 44, 33, -5);
+  world.add(info);
+
+  function setInfoLines(lines) {
+    ig.clearRect(0, 0, 1024, 200);
+    ig.fillStyle = '#fff'; ig.font = '500 34px "IBM Plex Mono", monospace'; ig.textBaseline = 'top';
+    lines.slice(0, 4).forEach((l, i) => ig.fillText(String(l).slice(0, 44), 4, 6 + i * 48));
+    info.userData.tex.needsUpdate = true;
+  }
+  const playC = mkCanvas(128, 128), pg = playC.getContext('2d');
+  pg.fillStyle = '#fff'; pg.fillRect(18, 18, 16, 92); pg.beginPath(); pg.moveTo(46, 18); pg.lineTo(112, 64); pg.lineTo(46, 110); pg.closePath(); pg.fill();
+  const play = extruded(playC, 8, 8, 6, 2.5, 0.55);
+  play.position.set(104, 45, -5);
+  world.add(play);
+
+  const logoC = mkCanvas(1040, 440), logoG = logoC.getContext('2d');
+  let logoArt = null;   // 1040x440 white-on-transparent canvas from a real station, or null for the placeholder
+  function drawLogo(glitch) {
+    const g = logoG;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 1040, 440);
+    const tmp = mkCanvas(1040, 440), t = tmp.getContext('2d');
+    if (logoArt) { t.drawImage(logoArt, 0, 0); } else {
+    t.setTransform(10, 0, 0, 10, 0, 0);
+    t.strokeStyle = '#fff'; t.fillStyle = '#fff'; t.lineCap = 'round';
+    t.beginPath(); t.arc(9, 24, 2.4, 0, Math.PI * 2); t.fill();
+    t.lineWidth = 2.2; [6, 10.5, 15].forEach(r => { t.beginPath(); t.arc(9, 24, r, -0.85, 0.85); t.stroke(); });
+    t.save(); t.transform(1, 0, -0.18, 1, 0, 0);
+    t.font = '700 16px "Chakra Petch", sans-serif'; t.fillText('NEON', 34, 21); t.fillText('DRIFT', 34, 39); t.restore();
+    t.font = '600 6px "Chakra Petch", sans-serif'; t.fillText('97.1', 88, 8);
+    t.fillRect(30, 41.5, 66, 1);
+    }
+    if (!glitch) { g.drawImage(tmp, 0, 0); }
+    else {
+      for (let sy = 0; sy < 440; sy += 30) {
+        const off = Math.random() < 0.35 ? (Math.random() - 0.5) * 90 : 0;
+        g.drawImage(tmp, 0, sy, 1040, 30, off, sy, 1040, 30);
+      }
+    }
+  }
+  drawLogo(false);
+  const logo = extruded(logoC, 100, 100 * 440 / 1040, 18, 8, 0.6);
+  logo.position.set(56, 2, -12);
+  world.add(logo);
+
+  // ---------- cyan outline on the glass (physical neon on the real radio) ----------
+  const outline = new THREE.Group(); scene.add(outline);
+  const neonMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 1.0, 0.97) });
+  function tubePath(pts, r) {
+    const path = new THREE.CurvePath();
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      if (b.c) {
+        path.add(new THREE.QuadraticBezierCurve3(new THREE.Vector3(a.x, a.y, 1), new THREE.Vector3(b.x, b.y, 1), new THREE.Vector3(pts[i + 2].x, pts[i + 2].y, 1)));
+        i++;
+      } else path.add(new THREE.LineCurve3(new THREE.Vector3(a.x, a.y, 1), new THREE.Vector3(b.x, b.y, 1)));
+    }
+    return new THREE.Mesh(new THREE.TubeGeometry(path, 400, r, 6, false), neonMat);
+  }
+  const P = (x, y, c) => ({ x, y, c });
+  outline.add(tubePath([
+    P(-141, 43), P(-133, 51),
+    P(-26, 51), P(-20, 51, 1), P(-20, 45),
+    P(-20, 22), P(-4, 6),
+    P(-4, -45), P(-4, -51, 1), P(-10, -51),
+    P(-135, -51), P(-141, -51, 1), P(-141, -45),
+    P(-141, 43),
+  ], 0.75));
+  outline.add(tubePath([
+    P(-4, -22), P(110, -22), P(118, -22, 1), P(118, -14),
+    P(118, 42), P(118, 50, 1), P(126, 50), P(146, 50),
+  ], 0.75));
+
+  // ---------- ghost echoes: the game's mirror ghosts, drawn in software at real depths ----------
+  const GHOST_F = [0.4, 0.16];
+  const ghostEq = GHOST_F.map(f => {
+    const m = new THREE.ShaderMaterial(Object.assign({ uniforms: { uBoost: { value: f }, uFade: { value: 0 }, uFloor: { value: FLOOR }, uHalf: { value: half }, uUnlit: unlitU, uEdge: edgeU, uCyan: { value: 0 } } }, glassOpts));
+    const g = new THREE.InstancedMesh(cubeGeo, m, BANDS * SEGS);
+    g.instanceMatrix = eq.instanceMatrix; g.frustumCulled = false;
+    world.add(g); return g;
+  });
+  const ghostSrc = [nowPlaying, marquee, info, play, logo];
+  ghostSrc.forEach(src => {
+    src.userData.ghosts = GHOST_F.map(f => {
+      const g = src.clone(true);
+      g.traverse(o => {
+        if (!o.material) return;
+        o.material = o.material.clone();
+        o.material.userData.base = o.material.color.clone();
+        o.material.userData.f = f;
+      });
+      world.add(g); return g;
+    });
+  });
+  function updateGhosts() {
+    ghostEq.forEach((g, k) => {
+      g.visible = S.ghosts && GHOST_ON.eq;
+      g.position.z = eq.position.z - S.gGap * (k + 1);
+      g.material.uniforms.uBoost.value = GHOST_F[k] * S.gBright;
+      g.material.uniforms.uCyan.value = S.gTint;
+    });
+    ghostSrc.forEach((src, si) => src.userData.ghosts.forEach((g, k) => {
+      g.visible = S.ghosts && GHOST_ON[GHOST_KEYS[si]];
+      g.position.set(src.position.x, src.position.y, src.position.z - S.gGap * (k + 1));
+      g.scale.x = src.scale.x;
+      g.traverse(o => {
+        const m = o.material;
+        if (m && m.userData.base) {
+          const b = m.userData.base, L = Math.max(b.r, b.g, b.b), t = S.gTint;
+          m.color.setRGB(b.r + (CY.r * L - b.r) * t, b.g + (CY.g * L - b.g) * t, b.b + (CY.b * L - b.b) * t)
+            .multiplyScalar(m.userData.f * S.gBright * (m.userData.k || 1));
+        }
+      });
+    }));
+  }
+
+  // ---------- layers ----------
+  // front (z = 0) is the glass: never moves on screen. middle holds the Hz strip, side markers
+  // and a dark band that hides the bottom of the bars. eq is the spectrum, behind the middle layer.
+  const LAYERS = { mid: 1, eq: 5.5, overlap: 0 };
+  const ELEM_LAYER = { title: 'eq', info: 'eq', logo: 'front', play: 'front' };
+  const GHOST_ON = { eq: true, mid: true, title: true, info: true, logo: true, play: false };
+  const GHOST_KEYS = ['title', 'title', 'info', 'play', 'logo'];          // matches ghostSrc order
+  const layerZ = n => n === 'front' ? 0 : n === 'mid' ? -LAYERS.mid : -LAYERS.eq;
+
+  // side markers: a dot beside every piece row, a small square near the top
+  const dotC = mkCanvas(64, 1536), dg = dotC.getContext('2d');
+  dg.fillStyle = '#fff';
+  for (let j = 0; j < SEGS; j++) {
+    const y = 1536 - (j + 0.5) / SEGS * 1536;
+    if (j === SEGS - 3) dg.fillRect(20, y - 12, 24, 24);
+    else { dg.beginPath(); dg.arc(32, y, 7, 0, Math.PI * 2); dg.fill(); }
+    if (j < SEGS - 1) { dg.beginPath(); dg.arc(32, y - 64, 4, 0, Math.PI * 2); dg.fill(); }
+  }
+  const dotTex = new THREE.CanvasTexture(dotC);
+  const dotMat = new THREE.MeshBasicMaterial({ map: dotTex, transparent: true, depthWrite: false, color: CY.clone() });
+  const dotGeo = new THREE.PlaneGeometry(2, SEGS * PITCH_Y);
+  const dotL = new THREE.Mesh(dotGeo, dotMat), dotR = new THREE.Mesh(dotGeo, dotMat);
+  const dotY = EQ_Y0 + SEGS * PITCH_Y / 2;
+  dotL.position.set(EQ_X0 - PITCH_X / 2 - 2, dotY, 0);
+  dotR.position.set(EQ_X0 + (BANDS - 0.5) * PITCH_X + 2, dotY, 0);
+  world.add(dotL, dotR);
+
+  // dark band behind the Hz labels: opaque, so the EQ behind it is hidden
+  const band = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x010505 }));
+  world.add(band);
+
+  // ghosts of the middle layer (Hz labels and markers); drawn over the band like mirror reflections
+  const midSrc = [labels, dotL, dotR];
+  const midGhosts = midSrc.map(src => GHOST_F.map(f => {
+    const m = src.material.clone(); m.depthTest = false; m.userData.f = f;
+    const g = new THREE.Mesh(src.geometry, m); g.renderOrder = 5; world.add(g); return g;
+  }));
+
+  function applyLayers() {
+    const zm = -LAYERS.mid;
+    eq.position.z = -EQ_Z - LAYERS.eq; refl.position.z = eq.position.z;
+    labels.position.z = zm + 0.06; dotL.position.z = dotR.position.z = zm + 0.06;
+    dotL.scale.y = dotR.scale.y = eqPitch / PITCH_Y;
+    dotL.position.y = dotR.position.y = EQ_Y0 + SEGS * eqPitch / 2;
+    const x0 = EQ_X0 - PITCH_X / 2 - 4.5, x1 = EQ_X0 + (BANDS - 0.5) * PITCH_X + 4.5;
+    const yTop = EQ_Y0 + LAYERS.overlap, yBot = -SH / 2 - 2;
+    band.scale.set(x1 - x0, yTop - yBot, 1);
+    band.position.set((x0 + x1) / 2, (yTop + yBot) / 2, zm);
+    [[nowPlaying, 'title'], [marquee, 'title'], [info, 'info'], [play, 'play'], [logo, 'logo']].forEach(([g, key]) => {
+      const L = ELEM_LAYER[key];
+      g.position.z = layerZ(L);
+      g.scale.z = L === 'front' ? 0.04 : 1;        // things on the glass are flat, like print
+    });
+    const lb = TUNE.labels;
+    dotMat.color.copy(CY).multiplyScalar(0.95 * lb);
+    midGhosts.forEach((list, si) => list.forEach((g, k) => {
+      const src = midSrc[si];
+      g.visible = S.ghosts && GHOST_ON.mid;
+      g.position.set(src.position.x, src.position.y, src.position.z - S.gGap * (k + 1));
+      g.material.color.copy(src.material.color).multiplyScalar(g.material.userData.f * S.gBright);
+    }));
+  }
+
+  // ---------- per-element brightness ----------
+  const ELEM = [[nowPlaying, 'title'], [marquee, 'title'], [info, 'info'], [play, 'play'], [logo, 'logo']];
+  ELEM.forEach(([g]) => g.traverse(o => { if (o.material) o.material.userData.base0 = o.material.color.clone(); }));
+  const labelsBase = labels.material.color.clone();
+  const neonBase = neonMat.color.clone();
+  const DEEP = new THREE.Color(0.12, 1.0, 0.92);   // saturated neon cyan
+  function applyBrightness() {
+    ELEM.forEach(([g, key]) => {
+      const t = TUNE[key + 'Cyan'] || 0;                  // pull toward a deep cyan so bright elements don't wash out to white
+      g.traverse(o => {
+        const m = o.material; if (!m || !m.userData.base0) return;
+        const b = m.userData.base0, L = Math.max(b.r, b.g, b.b);
+        m.color.setRGB(b.r + (DEEP.r * L - b.r) * t, b.g + (DEEP.g * L - b.g) * t, b.b + (DEEP.b * L - b.b) * t).multiplyScalar(TUNE[key]);
+      });
+      (g.userData.ghosts || []).forEach(gh => gh.traverse(o => { if (o.material) o.material.userData.k = TUNE[key]; }));
+    });
+    labels.material.color.copy(labelsBase).multiplyScalar(TUNE.labels);
+    { const b = neonBase, L = Math.max(b.r, b.g, b.b), t = TUNE.outlineCyan;
+      neonMat.color.setRGB(b.r + (DEEP.r * L - b.r) * t, b.g + (DEEP.g * L - b.g) * t, b.b + (DEEP.b * L - b.b) * t).multiplyScalar(TUNE.outline); }
+  }
+
+  // ---------- bloom ----------
+  const hdrTarget = new THREE.WebGLRenderTarget(512, 192, { type: PI.hdr === '1' ? THREE.HalfFloatType : THREE.UnsignedByteType });
+  const composer = new THREE.EffectComposer(renderer, hdrTarget);
+  composer.addPass(new THREE.RenderPass(scene, cam));
+  const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(512, 192), 0.7, 0.45, 0.45);
+  composer.addPass(bloom);
+
+  function resize() {
+    // test version: in big view at "Exactly 1920 x 720", size the screen to exactly 1920 x 720 device pixels,
+    // whatever the monitor, so the Pi does the same work as on the real Waveshare panel
+    // (if the window is smaller than that, it is shown shrunk to fit but still drawn at 1920 x 720)
+    const dpr = window.devicePixelRatio || 1;
+    const fixed = screenEl.classList.contains('big') && PI.size === 'real';
+    screenEl.classList.toggle('fixedSize', fixed);
+    let cssW = 0;
+    if (fixed) {
+      cssW = Math.min(1920 / dpr, window.innerWidth, window.innerHeight * 1920 / 720);
+      screenEl.style.width = cssW + 'px'; screenEl.style.height = (cssW * 720 / 1920) + 'px';
+    } else { screenEl.style.width = ''; screenEl.style.height = ''; }
+    const r = screenEl.getBoundingClientRect();
+    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    const pr = (fixed ? 1920 / w : Math.min(2, dpr)) * +PI.scale;
+    renderer.setPixelRatio(pr); renderer.setSize(w, h, false);
+    composer.setPixelRatio(pr); composer.setSize(w, h);
+    if (PI.glow === 'half') bloom.setSize(Math.round(w * pr / 2), Math.round(h * pr / 2));
+  }
+  new ResizeObserver(resize).observe(screenEl);
+  window.addEventListener('resize', resize);
+
+  // ---------- off-axis "window" camera ----------
+  const ZOOM = { k: 1, cx: 0, cy: 0 };
+  function setEye(ex, ey, ez) {
+    cam.position.set(ex, ey, ez); cam.rotation.set(0, 0, 0); cam.updateMatrixWorld(true);
+    const n = 5, f = 3000;
+    const hwz = SW / 2 / ZOOM.k, hhz = SH / 2 / ZOOM.k;      // zoom = a smaller window onto the same scene
+    const l = (ZOOM.cx - hwz - ex) * n / ez, r = (ZOOM.cx + hwz - ex) * n / ez;
+    const b = (ZOOM.cy - hhz - ey) * n / ez, t = (ZOOM.cy + hhz - ey) * n / ez;
+    cam.projectionMatrix.makePerspective(l, r, t, b, n, f);
+    cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+  }
+
+  // ---------- EQ simulation ----------
+  const lv = new Array(BANDS).fill(0.3), pk = new Array(BANDS).fill(0.3), hold = new Array(BANDS).fill(0);
+  function updateEQ(t, dt) {
+    const audioOn = readAudio();
+    const beat = Math.exp(-((t % 0.5) / 0.08));
+    const hat = Math.exp(-(((t + 0.25) % 0.25) / 0.04));
+    for (let i = 0; i < BANDS; i++) {
+      const base = 0.62 - i * 0.03;
+      const wob = 0.17 * Math.sin(t * (1.1 + i * 0.31) + i * 1.7) + 0.08 * Math.sin(t * 2.9 + i * 0.9);
+      const kick = i < 3 ? 0.32 * beat : i < 6 ? 0.1 * beat : 0;
+      const hh2 = i > 7 ? 0.18 * hat : 0;
+      if (audioOn) {
+        const target = bandLv[i];
+        lv[i] = target > lv[i] ? target : lv[i] + (target - lv[i]) * Math.min(1, dt * 5);
+      } else {
+        const target = Math.max(0.06, Math.min(1, base + wob + kick + hh2 + (Math.random() - 0.5) * 0.07));
+        lv[i] += (target - lv[i]) * Math.min(1, dt * 14);
+      }
+      if (lv[i] >= pk[i]) { pk[i] = lv[i]; hold[i] = 0.35; }
+      else { hold[i] -= dt; if (hold[i] < 0) pk[i] = Math.max(lv[i], pk[i] - dt * 0.55); }
+    }
+    for (let i = 0; i < BANDS; i++) {
+      const lit = Math.max(1, Math.round(lv[i] * SEGS));
+      const peak = Math.min(SEGS - 1, Math.floor(pk[i] * SEGS));
+      for (let j = 0; j < SEGS; j++) {
+        let r, g, b;
+        if (j < lit) {
+          if (j >= lit - TUNE.topCount) { const w = TUNE.topWhite, k = TUNE.topBright; r = (0.31 + 0.69 * w) * k; g = k; b = (0.90 + 0.10 * w) * k; }
+          else { const f = j / SEGS, k = TUNE.eqBright; r = (0.04 + 0.22 * f) * k; g = (0.58 + 0.36 * f) * k; b = (0.58 + 0.30 * f) * k; }
+        } else if (TUNE.peaks && j === peak && peak >= lit) { const w = TUNE.topWhite, k = TUNE.topBright; r = (0.31 + 0.69 * w) * k; g = k; b = (0.90 + 0.10 * w) * k; }
+        else { r = 0.0; g = 0.07; b = 0.075; }
+        const k = (i * SEGS + j) * 3; colors[k] = r; colors[k + 1] = g; colors[k + 2] = b;
+      }
+    }
+    colorAttr.needsUpdate = true;
+  }
+
+  // ---------- controls ----------
+  const S = { drift: false, dist: 550, depth: 1, glow: 0.7, refl: false, room: false, frame: true, anchor: 0, ghosts: true, gGap: 54, gBright: 0.75, eqGap: 3.2, showUnlit: false, gTint: 1 };
+  const eye = { x: 0, y: 10 }, target = { x: 0, y: 10 };
+  let manualUntil = 0;
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) { S.drift = false; $('drift').checked = false; }
+
+  // ---------- textures that change size ----------
+  function swapTex(group, canvas) {
+    const old = group.userData.tex;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = old.anisotropy; tex.wrapS = old.wrapS;
+    group.children.forEach(m => { m.material.map = tex; m.material.needsUpdate = true; });
+    (group.userData.ghosts || []).forEach(gh => gh.traverse(o => { if (o.material && o.material.map) { o.material.map = tex; o.material.needsUpdate = true; } }));
+    group.userData.tex = tex; old.dispose();
+    return tex;
+  }
+  function setStationCanvas(c) {
+    const tex = swapTex(marquee, c);
+    tex.wrapS = THREE.RepeatWrapping;
+    mqTextW = MQ_H * c.width / c.height; tex.repeat.x = MQ_W / mqTextW;
+  }
+  function redrawTitles() {
+    updateFontStrings();
+    const c = textCanvas('NOW PLAYING', 64, FONT_D6);
+    swapTex(nowPlaying, c);
+    const newW = npH * c.width / c.height;
+    nowPlaying.scale.x = newW / npW; nowPlaying.position.x = -24 - newW / 2;
+    setStationCanvas(textCanvas(mqText, 120, FONT_D, 0));
+  }
+  function setStationText(str) { mqText = str + '  ·  '; setStationCanvas(textCanvas(mqText, 120, FONT_D, 0)); }
+  const DEFAULT_STATION = 'NEON DRIFT  ·  97.1 FM  ·  MIDNIGHT FREQUENCIES';
+
+  // ---------- real audio ----------
+  const BAND_HZ = [40, 100, 300, 600, 1000, 2000, 4000, 6000, 9000, 12000, 16000];
+  const DISPLAY_MS = 25;              // rough time for a frame to reach the screen
+  const bandLv = new Float32Array(BANDS);
+  let actx = null, anLow, anHigh, binsLow, binsHigh, visDelay, audDelay;
+  let mediaEl = null, mediaNode = null, clickNode = null, clickBuf = null;
+  let mode = 'demo', playing = false, syncMs = 0, latMs = 0, fileName = '';
+
+  function ensureCtx() {
+    if (actx) return actx;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    actx = new AC();
+    anLow = actx.createAnalyser(); anLow.fftSize = 2048; anLow.smoothingTimeConstant = 0;
+    anHigh = actx.createAnalyser(); anHigh.fftSize = 512; anHigh.smoothingTimeConstant = 0;
+    binsLow = new Float32Array(anLow.frequencyBinCount); binsHigh = new Float32Array(anHigh.frequencyBinCount);
+    visDelay = actx.createDelay(1.0); audDelay = actx.createDelay(1.0);
+    visDelay.connect(anLow); visDelay.connect(anHigh);
+    audDelay.connect(actx.destination);
+    applySync();
+    return actx;
+  }
+  function applySync() {
+    if (!actx) return;
+    latMs = Math.round(((actx.outputLatency || 0) + (actx.baseLatency || 0)) * 1000);
+    const off = latMs - DISPLAY_MS + syncMs;           // >0: hold the picture back, <0: hold the sound back
+    visDelay.delayTime.value = Math.max(0, off) / 1000;
+    audDelay.delayTime.value = Math.max(0, -off) / 1000;
+    const what = off > 0 ? `Picture held back ${off} ms.` : off < 0 ? `Sound held back ${-off} ms.` : 'No correction needed.';
+    $('latOut').textContent = `Your browser reports ${latMs} ms of audio output delay. ${what} Bluetooth headphones add much more, so use speakers to judge.`;
+  }
+  function bandDb(an, bins, lo, hi) {
+    const hzPerBin = actx.sampleRate / an.fftSize;
+    const a = Math.max(1, Math.floor(lo / hzPerBin));
+    const b = Math.max(a, Math.min(bins.length - 1, Math.ceil(hi / hzPerBin)));
+    let sum = 0;
+    for (let k = a; k <= b; k++) sum += Math.pow(10, bins[k] / 10);
+    return 10 * Math.log10(sum / (b - a + 1) + 1e-12);
+  }
+  function readAudio() {
+    if (mode === 'demo' || !actx) return false;
+    anLow.getFloatFrequencyData(binsLow); anHigh.getFloatFrequencyData(binsHigh);
+    for (let i = 0; i < BANDS; i++) {
+      const fc = BAND_HZ[i];
+      const lo = i ? Math.sqrt(fc * BAND_HZ[i - 1]) : 25;
+      const hi = i < BANDS - 1 ? Math.sqrt(fc * BAND_HZ[i + 1]) : 20000;
+      const db = fc < 1000 ? bandDb(anLow, binsLow, lo, hi) : bandDb(anHigh, binsHigh, lo, hi);
+      const tilt = 3 * Math.log2(fc / 1000);          // music gets quieter toward the treble
+      bandLv[i] = Math.max(0, Math.min(1, (db + tilt + 78) / 56));
+    }
+    return true;
+  }
+  function makeClickBuf() {
+    const sr = actx.sampleRate, len = sr * 4, buf = actx.createBuffer(1, len, sr), d = buf.getChannelData(0);
+    for (let beat = 0; beat < 8; beat++) {             // kick on every beat, 120 BPM
+      const s0 = Math.floor(beat * 0.5 * sr); let ph = 0;
+      for (let n = 0; n < sr * 0.2 && s0 + n < len; n++) {
+        const t = n / sr, f = 50 + 110 * Math.exp(-t * 35);
+        ph += 2 * Math.PI * f / sr; d[s0 + n] += 0.8 * Math.sin(ph) * Math.exp(-t * 16);
+      }
+    }
+    for (let b = 1; b < 8; b += 2) {                   // snare on 2 and 4
+      const s0 = Math.floor(b * 0.5 * sr);
+      for (let n = 0; n < sr * 0.14; n++) { const t = n / sr; d[s0 + n] += ((Math.random() * 2 - 1) * 0.3 + 0.25 * Math.sin(2 * Math.PI * 190 * t)) * Math.exp(-t * 24); }
+    }
+    for (let h = 0; h < 16; h++) {                     // hi-hat on the off-beats
+      const s0 = Math.floor((h * 0.25 + 0.125) * sr); let prev = 0;
+      for (let n = 0; n < sr * 0.04; n++) { const w = Math.random() * 2 - 1; d[s0 + n] += (w - prev) * 0.18 * Math.exp(-n / sr * 90); prev = w; }
+    }
+    return buf;
+  }
+  function stopClick() { if (clickNode) { try { clickNode.stop(); } catch (e) {} clickNode.disconnect(); clickNode = null; } }
+  function startClick() {
+    ensureCtx(); actx.resume();
+    if (mediaEl) mediaEl.pause();
+    stopClick();
+    if (!clickBuf) clickBuf = makeClickBuf();
+    clickNode = actx.createBufferSource(); clickNode.buffer = clickBuf; clickNode.loop = true;
+    clickNode.connect(visDelay); clickNode.connect(audDelay);
+    clickNode.start();
+    mode = 'click'; playing = true; setStationText('SYNC TEST  ·  120 BPM'); applySync(); musicUI();
+  }
+  function musicUI() {
+    $('demoBtn').setAttribute('aria-pressed', String(mode === 'demo'));
+    $('clickBtn').setAttribute('aria-pressed', String(mode === 'click'));
+    const pb = $('playBtn');
+    pb.disabled = mode === 'demo';
+    pb.textContent = playing ? 'Pause' : 'Play';
+    const t = $('trackOut');
+    if (mode === 'demo') t.textContent = 'Demo animation running. Pick a song from your computer to drive the EQ with real audio. The file plays here in your browser and isn’t uploaded anywhere.';
+    else if (mode === 'click') t.innerHTML = '<b>Sync test beat</b> · kick on every beat, snare on 2 and 4, hi-hats in between. The low bars should jump exactly on the kick.';
+    else t.innerHTML = `<b>${fileName.replace(/[<>&]/g, '')}</b> · ${playing ? 'playing' : 'paused'}`;
+    $('syncOut').textContent = (syncMs > 0 ? '+' : '') + syncMs + ' ms';
+  }
+
+  $('pickBtn').addEventListener('click', () => { ensureCtx(); actx.resume(); $('file').click(); });
+  $('file').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    ensureCtx(); stopClick();
+    if (!mediaEl) {
+      mediaEl = new Audio(); mediaEl.loop = true; mediaEl.crossOrigin = 'anonymous';
+      mediaNode = actx.createMediaElementSource(mediaEl);
+      mediaNode.connect(visDelay); mediaNode.connect(audDelay);
+      mediaEl.addEventListener('pause', () => { if (mode === 'file') { playing = false; musicUI(); } });
+      mediaEl.addEventListener('play', () => { if (mode === 'file') { playing = true; musicUI(); } });
+    }
+    if (mediaEl.src) URL.revokeObjectURL(mediaEl.src);
+    mediaEl.src = URL.createObjectURL(f);
+    fileName = f.name; mode = 'file';
+    setStationText(f.name.replace(/\.[^.]+$/, '').toUpperCase().slice(0, 60));
+    actx.resume(); applySync();
+    mediaEl.play().then(() => { playing = true; musicUI(); }).catch(() => { playing = false; musicUI(); });
+    musicUI();
+    e.target.value = '';
+  });
+  $('clickBtn').addEventListener('click', startClick);
+  $('playBtn').addEventListener('click', () => {
+    if (!actx) return; actx.resume();
+    if (mode === 'file' && mediaEl) { if (mediaEl.paused) mediaEl.play().catch(() => {}); else mediaEl.pause(); }
+    else if (mode === 'click') { if (playing) { stopClick(); playing = false; musicUI(); } else startClick(); }
+  });
+  $('demoBtn').addEventListener('click', () => {
+    stopClick(); if (mediaEl) mediaEl.pause();
+    mode = 'demo'; playing = false; setStationText(DEFAULT_STATION); musicUI();
+  });
+  $('sync').addEventListener('input', e => { syncMs = +e.target.value; applySync(); musicUI(); });
+  musicUI();
+
+  function syncOut() {
+    $('distOut').textContent = Math.round(S.dist / 10) + ' cm';
+    $('depthOut').textContent = S.depth.toFixed(2) + '×';
+    $('glowOut').textContent = S.glow.toFixed(2);
+    $('eqGapOut').textContent = S.eqGap.toFixed(1) + ' mm';
+    $('eqWOut').textContent = EQ_DIM.w.toFixed(1) + ' mm';
+    $('eqHOut').textContent = EQ_DIM.h.toFixed(1) + ' mm';
+    $('eqDOut').textContent = EQ_DIM.d.toFixed(1) + ' mm';
+    $('gGapOut').textContent = S.gGap.toFixed(1) + ' mm';
+    $('gTintOut').textContent = S.gTint.toFixed(2);
+    $('gBrightOut').textContent = S.gBright.toFixed(2) + '×';
+  }
+  $('dist').addEventListener('input', e => { S.dist = +e.target.value; syncOut(); });
+  $('depth').addEventListener('input', e => { S.depth = +e.target.value; syncOut(); });
+  $('glow').addEventListener('input', e => { S.glow = +e.target.value; syncOut(); });
+  $('showUnlit').addEventListener('change', e => { S.showUnlit = e.target.checked; });
+  $('eqGap').addEventListener('input', e => { S.eqGap = EQ_DIM.gap = +e.target.value; layoutEQ(); syncOut(); });
+  $('eqH').addEventListener('input', e => { EQ_DIM.h = +e.target.value; layoutEQ(); syncOut(); });
+  $('eqW').addEventListener('input', e => { EQ_DIM.w = +e.target.value; layoutEQ(); syncOut(); });
+  $('eqD').addEventListener('input', e => { EQ_DIM.d = +e.target.value; layoutEQ(); syncOut(); });
+  $('ghosts').addEventListener('change', e => { S.ghosts = e.target.checked; });
+  $('gGap').addEventListener('input', e => { S.gGap = +e.target.value; syncOut(); });
+  $('gTint').addEventListener('input', e => { S.gTint = +e.target.value; syncOut(); });
+  $('gBright').addEventListener('input', e => { S.gBright = +e.target.value; syncOut(); });
+  $('drift').addEventListener('change', e => { S.drift = e.target.checked; });
+  $('refl').addEventListener('change', e => { S.refl = e.target.checked; });
+  $('room').addEventListener('change', e => { S.room = e.target.checked; });
+  $('frame').addEventListener('change', e => { S.frame = e.target.checked; });
+  const setView = (x, y) => { target.x = x; target.y = y; manualUntil = performance.now() + 6000; };
+  $('vHead').addEventListener('click', () => setView(0, 6));
+  $('vLeft').addEventListener('click', () => setView(-230, 60));
+  $('vAbove').addEventListener('click', () => setView(20, 230));
+
+  function pointerToEye(e) {
+    if (PI.view === 'lock') return;   // test version: keep the view centred so every reading is comparable
+    const r = screenEl.getBoundingClientRect();
+    const u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+    target.x = (u - 0.5) * 2 * 260;
+    target.y = (0.5 - v) * 2 * 160 + 10;
+    manualUntil = performance.now() + 3500;
+  }
+  // ---------- zoom: renders a smaller part of the screen at full sharpness ----------
+  const ZPRESET = { full: [1, 0, 0], eq: [2.2, -72, -14], tops: [4, -72, -12], hz: [4, -72, -45],
+                    title: [2.6, -80, 32], logo: [2.6, 60, 2], info: [3, 50, 36], play: [6, 104, 45] };
+  function clampZoom() {
+    const hw = SW / 2 / ZOOM.k, hh = SH / 2 / ZOOM.k;
+    ZOOM.cx = Math.max(-SW / 2 + hw, Math.min(SW / 2 - hw, ZOOM.cx));
+    ZOOM.cy = Math.max(-SH / 2 + hh, Math.min(SH / 2 - hh, ZOOM.cy));
+  }
+  function setZoom(k, cx, cy) {
+    ZOOM.k = Math.max(1, Math.min(10, k)); ZOOM.cx = cx; ZOOM.cy = cy; clampZoom();
+    $('zLbl').textContent = (ZOOM.k < 10 ? ZOOM.k.toFixed(1) : '10') + '×';
+    screenEl.classList.toggle('zoomed', ZOOM.k > 1.01);
+    if (ZOOM.k <= 1.01) $('zPreset').value = 'full';
+  }
+  function screenPoint(e) {
+    const r = screenEl.getBoundingClientRect();
+    const u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+    return [ZOOM.cx + (u - 0.5) * SW / ZOOM.k, ZOOM.cy + (0.5 - v) * SH / ZOOM.k];
+  }
+  $('zIn').addEventListener('click', () => setZoom(ZOOM.k * 1.5, ZOOM.cx, ZOOM.cy));
+  $('zOut').addEventListener('click', () => setZoom(ZOOM.k / 1.5, ZOOM.cx, ZOOM.cy));
+  $('zPreset').addEventListener('change', e => { const z = ZPRESET[e.target.value]; setZoom(z[0], z[1], z[2]); });
+  $('zBig').addEventListener('click', () => {
+    const on = !screenEl.classList.contains('big');
+    screenEl.classList.toggle('big', on); document.body.classList.toggle('bigview', on);
+    $('zBig').setAttribute('aria-pressed', String(on)); $('zBig').textContent = on ? 'Exit big view' : 'Big view';
+  });
+  ['pointerdown', 'pointermove'].forEach(t => $('screen').querySelector('.zoomBar').addEventListener(t, e => e.stopPropagation()));
+
+  // ---------- Pi speed test: switches and counter (test version only) ----------
+  ['pointerdown', 'pointermove'].forEach(t => $('piHud').addEventListener(t, e => e.stopPropagation()));
+  const PI_STACKS = [nowPlaying, marquee, info, play, logo];
+  function piApplyLayers() {
+    // each 3D text or logo is a stack of flat copies; i = 0 is the front copy and is always kept
+    PI_STACKS.forEach(src => [src, ...(src.userData.ghosts || [])].forEach(g => {
+      const n = g.children.length, step = Math.ceil(n / 4);
+      g.children.forEach((m, c) => {
+        const i = n - 1 - c;
+        m.visible = PI.layers === 'full' || i === 0 || (PI.layers === 'fewer' && i % step === 0);
+      });
+    }));
+  }
+  function piApply() {
+    S.ghosts = PI.ghosts === 'on'; $('ghosts').checked = S.ghosts;
+    if (PI.view === 'lock') { target.x = 0; target.y = 10; manualUntil = 0; }
+    piApplyLayers();
+    resize();
+    Object.keys(PI).forEach(k => {
+      const el = $('pi' + k[0].toUpperCase() + k.slice(1));
+      if (el) { el.value = PI[k]; el.classList.toggle('changed', PI[k] !== PI_DEFAULT[k]); }
+    });
+    piTimes.length = 0;   // start a fresh 10-second average after every change
+  }
+  Object.keys(PI).forEach(k => {
+    const el = $('pi' + k[0].toUpperCase() + k.slice(1));
+    if (!el) return;
+    el.addEventListener('change', () => {
+      PI[k] = el.value; piSaveUrl();
+      if (PI_RELOAD.includes(k)) { location.reload(); return; }
+      piApply();
+    });
+  });
+  $('piReset').addEventListener('click', () => {
+    const needReload = PI_RELOAD.some(k => PI[k] !== PI_DEFAULT[k]);
+    Object.assign(PI, PI_DEFAULT); piSaveUrl();
+    if (needReload) { location.reload(); return; }
+    piApply();
+  });
+  $('piFold').addEventListener('click', () => {
+    const c = $('piHud').classList.toggle('collapsed');
+    $('piFold').textContent = c ? 'Show switches' : 'Hide switches';
+    $('piFold').setAttribute('aria-expanded', String(!c));
+  });
+  // frame counter: FPS over the last second, average over the last 10 seconds, time the browser spends preparing each frame
+  const piTimes = [], piCpu = [];
+  let piLastHud = 0;
+  function piFrame(nowMs, cpuMs) {
+    piTimes.push(nowMs); piCpu.push(cpuMs);
+    while (piTimes.length && nowMs - piTimes[0] > 10000) piTimes.shift();
+    while (piCpu.length > 120) piCpu.shift();
+    if (nowMs - piLastHud < 500) return;
+    piLastHud = nowMs;
+    const n1 = piTimes.filter(x => nowMs - x <= 1000).length;
+    const span = (nowMs - piTimes[0]) / 1000;
+    const avg = piTimes.length > 1 && span > 0 ? (piTimes.length - 1) / span : 0;
+    const recent = piCpu.slice(-Math.max(1, n1));
+    const cpu = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const cls = v => v >= 30 ? '' : v >= 20 ? 'ok' : 'bad';
+    $('piFps').textContent = n1; $('piFps').className = cls(n1);
+    $('piAvg').textContent = span >= 9.5 ? avg.toFixed(1) : '…'; $('piAvg').className = span >= 9.5 ? cls(avg) : '';
+    $('piMeta').textContent = `drawing ${canvas.width}×${canvas.height} · ${renderer.info.render.calls} draw calls · prep ${cpu.toFixed(1)} ms/frame`;
+  }
+  piApply();
+  if (PQ.get('big') !== '0') $('zBig').click();   // open straight into big view
+
+  let dragging = false, panStart = null, lastTap = 0, lastXY = null;
+  screenEl.addEventListener('pointermove', e => {
+    if (panStart) {
+      const r = screenEl.getBoundingClientRect();
+      ZOOM.cx = panStart.cx - (e.clientX - panStart.x) / r.width * SW / ZOOM.k;
+      ZOOM.cy = panStart.cy + (e.clientY - panStart.y) / r.height * SH / ZOOM.k;
+      clampZoom(); return;
+    }
+    if (e.pointerType === 'mouse' || dragging) pointerToEye(e);
+  });
+  screenEl.addEventListener('pointerdown', e => {
+    const now = performance.now();
+    if (now - lastTap < 320 && lastXY && Math.hypot(e.clientX - lastXY[0], e.clientY - lastXY[1]) < 30) {
+      // double tap: zoom in 3x where you tapped, or back out
+      lastTap = 0;
+      if (ZOOM.k > 1.01) setZoom(1, 0, 0); else { const [px, py] = screenPoint(e); setZoom(3, px, py); }
+      return;
+    }
+    lastTap = now; lastXY = [e.clientX, e.clientY];
+    if (ZOOM.k > 1.01) panStart = { x: e.clientX, y: e.clientY, cx: ZOOM.cx, cy: ZOOM.cy };
+    else { dragging = true; pointerToEye(e); }
+  });
+  window.addEventListener('pointerup', () => { dragging = false; panStart = null; });
+  window.addEventListener('pointercancel', () => { dragging = false; panStart = null; });
+
+  // ---------- collapsible panels ----------
+  const LS = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
+  const folds = [];
+  document.querySelectorAll('section.card').forEach(card => {
+    const h = card.querySelector('h2'); if (!h) return;
+    const body = document.createElement('div'); body.className = 'cardBody';
+    while (h.nextSibling) body.appendChild(h.nextSibling);
+    card.appendChild(body);
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'fold'; btn.setAttribute('aria-expanded', 'true');
+    btn.innerHTML = '<span class="chev" aria-hidden="true">▾</span><span></span>';
+    btn.lastChild.textContent = h.textContent;
+    h.textContent = ''; h.appendChild(btn);
+    const key = 'radio3d-fold:' + (h.id || btn.textContent);
+    const set = open => {
+      btn.setAttribute('aria-expanded', String(open)); body.hidden = !open;
+      card.classList.toggle('folded', !open); LS.set(key, open ? '1' : '0');
+    };
+    btn.addEventListener('click', () => set(body.hidden));
+    if (LS.get(key) === '0') set(false);
+    folds.push(set);
+  });
+  $('foldAll').addEventListener('click', () => folds.forEach(f => f(false)));
+  $('openAll').addEventListener('click', () => folds.forEach(f => f(true)));
+  const pinSaved = LS.get('radio3d-pin');
+  if (pinSaved === '0') { $('pinScreen').checked = false; $('bezel').classList.remove('pinned'); }
+  $('pinScreen').addEventListener('change', e => {
+    $('bezel').classList.toggle('pinned', e.target.checked); LS.set('radio3d-pin', e.target.checked ? '1' : '0');
+  });
+
+  // ---------- layers panel ----------
+  document.querySelectorAll('[data-layer]').forEach(inp => {
+    const key = inp.dataset.layer, out = document.getElementById(inp.id + 'Out');
+    const show = () => { out.textContent = LAYERS[key].toFixed(1) + ' mm'; };
+    inp.value = LAYERS[key]; show();
+    inp.addEventListener('input', () => { LAYERS[key] = +inp.value; show(); });
+  });
+  document.querySelectorAll('[data-elem]').forEach(sel => {
+    sel.value = ELEM_LAYER[sel.dataset.elem];
+    sel.addEventListener('change', () => { ELEM_LAYER[sel.dataset.elem] = sel.value; });
+  });
+  document.querySelectorAll('[data-ghost]').forEach(cb => {
+    cb.checked = GHOST_ON[cb.dataset.ghost];
+    cb.addEventListener('change', () => { GHOST_ON[cb.dataset.ghost] = cb.checked; });
+  });
+
+  // ---------- font controls ----------
+  const loadFont = (fam, w) => (document.fonts && document.fonts.load) ? document.fonts.load(`${w} 40px "${fam}"`).catch(() => {}) : Promise.resolve();
+  document.querySelectorAll('[data-font]').forEach(sel => {
+    const key = sel.dataset.font;
+    sel.value = String(FONTCFG[key]);
+    sel.addEventListener('change', () => {
+      FONTCFG[key] = key.endsWith('W') ? +sel.value : sel.value;
+      Promise.all([loadFont(FONTCFG.title, FONTCFG.titleW), loadFont(FONTCFG.title, FONTCFG.npW), loadFont(FONTCFG.hz, FONTCFG.hzW)])
+        .then(() => { redrawTitles(); drawLabels(); });
+    });
+  });
+
+  // ---------- fine-tune panel ----------
+  document.querySelectorAll('[data-tune]').forEach(inp => {
+    const key = inp.dataset.tune, out = document.getElementById(inp.id + 'Out');
+    const show = () => { if (out) out.textContent = key === 'topCount' ? String(TUNE[key]) : (+TUNE[key]).toFixed(2) + (key === 'topWhite' || key.endsWith('Cyan') ? '' : '×'); };
+    if (inp.type === 'checkbox') inp.checked = !!TUNE[key]; else inp.value = TUNE[key];
+    show();
+    inp.addEventListener('input', () => { TUNE[key] = inp.type === 'checkbox' ? inp.checked : +inp.value; show(); });
+  });
+  $('tuneCopy').addEventListener('click', () => {
+    const dump = JSON.stringify({ tune: TUNE, eq: EQ_DIM, eqGap: S.eqGap, ghostSpacing: S.gGap, ghostBrightness: S.gBright,
+                                  depth: S.depth, glow: S.glow, ghostTint: S.gTint, fonts: FONTCFG, layers: LAYERS, elementLayers: ELEM_LAYER, ghostsOn: GHOST_ON });
+    const pre = $('tuneDump'); pre.textContent = dump; pre.hidden = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(dump).then(() => { $('tuneCopy').textContent = 'Copied. Paste it to Claude'; },
+        () => { $('tuneCopy').textContent = 'Select the text below and copy it'; });
+    }
+  });
+
+  // ---------- real internet stations (Radio Browser) ----------
+  const RB_HOSTS = ['all.api.radio-browser.info', 'de1.api.radio-browser.info', 'de2.api.radio-browser.info', 'fi1.api.radio-browser.info', 'nl1.api.radio-browser.info'];
+  let stImg = null, stCur = null, plainEl = null;
+  const stStatus = t => { $('stStatus').textContent = t; };
+  const PAGE = 60;
+  async function rbGet(path, params) {
+    for (const h of RB_HOSTS) {
+      try {
+        const r = await fetch(`https://${h}/json/${path}${params ? '?' + params : ''}`);
+        if (r.ok) return await r.json();
+      } catch (e) {}
+    }
+    throw new Error('the Radio Browser directory could not be reached');
+  }
+  // q empty = no text filter, so the list is simply the most played stations for the chosen country and language
+  async function rbSearch(q, by, offset) {
+    const params = new URLSearchParams({ limit: String(PAGE), offset: String(offset), hidebroken: 'true', order: 'clickcount', reverse: 'true' });
+    if (q) params.set(by, q);
+    const cc = $('stCountry').value, lang = $('stLang').value;
+    if (cc) params.set('countrycode', cc);
+    if (lang) params.set('language', lang);
+    return await rbGet('stations/search', params);
+  }
+
+  // country and language menus, filled from the directory with station counts
+  (async () => {
+    try {
+      const cs = await rbGet('countries', new URLSearchParams({ order: 'name', hidebroken: 'true' }));
+      const sel = $('stCountry'), keep = sel.value;
+      sel.innerHTML = '<option value="">Any country</option>';
+      cs.filter(c => c.iso_3166_1 && c.stationcount > 0).forEach(c => {
+        const o = document.createElement('option'); o.value = c.iso_3166_1.toUpperCase();
+        o.textContent = `${c.name} (${c.stationcount})`; sel.appendChild(o);
+      });
+      sel.value = keep;
+    } catch (e) {}
+    try {
+      const ls = await rbGet('languages', new URLSearchParams({ order: 'stationcount', reverse: 'true', hidebroken: 'true' }));
+      const sel = $('stLang');
+      ls.filter(l => l.name && l.stationcount >= 20).slice(0, 80).sort((a, b) => a.name.localeCompare(b.name)).forEach(l => {
+        const o = document.createElement('option'); o.value = l.name;
+        o.textContent = `${l.name[0].toUpperCase() + l.name.slice(1)} (${l.stationcount})`; sel.appendChild(o);
+      });
+    } catch (e) {}
+  })();
+
+  // favourites live in this browser only
+  const FAV_KEY = 'radio3d-favs';
+  const loadFavs = () => { try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch (e) { return []; } };
+  const saveFavs = f => { try { localStorage.setItem(FAV_KEY, JSON.stringify(f)); } catch (e) {} };
+  let favs = loadFavs();
+  const favId = st => st.stationuuid || st.url_resolved;
+  const isFav = st => favs.some(f => favId(f) === favId(st));
+  function toggleFav(st) {
+    if (isFav(st)) favs = favs.filter(f => favId(f) !== favId(st));
+    else favs.push({ stationuuid: st.stationuuid, name: st.name, url: st.url, url_resolved: st.url_resolved, favicon: st.favicon, countrycode: st.countrycode,
+                     country: st.country, state: st.state, codec: st.codec, bitrate: st.bitrate, tags: st.tags });
+    saveFavs(favs);
+  }
+
+  let view = { kind: 'search', q: '', by: 'tag', offset: 0, seen: new Set() };
+  function setTab(kind) {
+    $('stTop').setAttribute('aria-pressed', String(kind === 'top'));
+    $('stFavs').setAttribute('aria-pressed', String(kind === 'favs'));
+  }
+  function renderList(list, append) {
+    const box = $('stList');
+    if (!append) { box.innerHTML = ''; view.seen = new Set(); box.scrollTop = 0; }
+    list = list.filter(st => st.url_resolved && !st.hls && !view.seen.has(favId(st)));
+    if (!append && !list.length) { box.textContent = view.kind === 'favs' ? 'No favourites yet. Tap the ☆ next to a station to add it.' : 'No stations found. Try another search.'; return 0; }
+    list.forEach(st => {
+      view.seen.add(favId(st));
+      const row = document.createElement('div'); row.className = 'stRow';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'stItem'; b.setAttribute('aria-pressed', 'false');
+      const im = document.createElement('img'); im.alt = ''; im.loading = 'lazy'; if (st.favicon) im.src = st.favicon; im.onerror = () => { im.style.visibility = 'hidden'; };
+      const t = document.createElement('span'); t.className = 't';
+      const n = document.createElement('b'); n.textContent = st.name.trim();
+      const d = document.createElement('span');
+      d.textContent = [st.countrycode, st.codec, st.bitrate ? st.bitrate + ' kbps' : '', (st.tags || '').split(',').slice(0, 3).join(', '), st.favicon ? '' : 'no logo'].filter(Boolean).join(' · ');
+      t.append(n, d); b.append(im, t);
+      b.addEventListener('click', () => { box.querySelectorAll('.stItem').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); selectStation(st); });
+      const f = document.createElement('button'); f.type = 'button'; f.className = 'stFav';
+      const showFav = () => { const on = isFav(st); f.textContent = on ? '★' : '☆'; f.setAttribute('aria-pressed', String(on)); f.setAttribute('aria-label', (on ? 'Remove ' : 'Add ') + st.name.trim() + (on ? ' from favourites' : ' to favourites')); };
+      f.addEventListener('click', () => { toggleFav(st); showFav(); if (view.kind === 'favs' && !isFav(st)) row.remove(); });
+      showFav();
+      row.append(b, f); box.appendChild(row);
+    });
+    return list.length;
+  }
+  async function runSearch(kind, q, by) {
+    view = { kind, q: (q || '').trim(), by, offset: 0, seen: new Set() };
+    setTab(kind); $('stMore').hidden = true;
+    if (kind === 'search' && !view.q) return;
+    stStatus(kind === 'top' ? 'Loading the most played stations…' : 'Searching…');
+    try {
+      const list = await rbSearch(view.q, by, 0);
+      const n = renderList(list, false);
+      $('stMore').hidden = list.length < PAGE;
+      const where = [$('stCountry').selectedOptions[0], $('stLang').selectedOptions[0]].filter(o => o && o.value).map(o => o.textContent.replace(/ \(\d+\)$/, '')).join(', ');
+      stStatus(kind === 'top' ? `Most played stations${where ? ' · ' + where : ' worldwide'}. Pick one.` : `${n} stations found${list.length >= PAGE ? ', most played first' : ''}. Pick one.`);
+    } catch (e) { stStatus('Search failed: ' + e.message + '. Check your internet connection.'); }
+  }
+  async function showMore() {
+    const btn = $('stMore'); btn.disabled = true; btn.textContent = 'Loading…';
+    try {
+      view.offset += PAGE;
+      const list = await rbSearch(view.q, view.by, view.offset);
+      renderList(list, true);
+      btn.hidden = list.length < PAGE;
+      stStatus(`${view.seen.size} stations shown.`);
+    } catch (e) { stStatus('Could not load more: ' + e.message + '.'); }
+    btn.disabled = false; btn.textContent = 'Show more';
+  }
+  function showFavs() {
+    view = { kind: 'favs', q: '', by: '', offset: 0, seen: new Set() };
+    setTab('favs'); $('stMore').hidden = true;
+    renderList(favs.slice(), false);
+    stStatus(favs.length ? `${favs.length} favourite${favs.length === 1 ? '' : 's'}. Saved in this browser.` : 'No favourites yet.');
+  }
+  const doSearch = (q, by) => runSearch('search', q, by);
+  $('stGo').addEventListener('click', () => doSearch($('stQ').value, $('stBy').value));
+  $('stQ').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch($('stQ').value, $('stBy').value); });
+  $('stTop').addEventListener('click', () => runSearch('top', '', 'tag'));
+  $('stFavs').addEventListener('click', showFavs);
+  $('stMore').addEventListener('click', showMore);
+  // changing country or language re-runs whatever list is showing
+  ['stCountry', 'stLang'].forEach(id => $(id).addEventListener('change', () => { if (view.kind === 'top') runSearch('top', '', 'tag'); else if (view.kind === 'search' && view.q) runSearch('search', view.q, view.by); }));
+  $('stQuick').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('stQ').value = b.dataset.q; $('stBy').value = b.dataset.by; doSearch(b.dataset.q, b.dataset.by);
+  });
+
+  // logo images come from many sites; an image proxy adds the permission the page needs to read their pixels
+  const loadImg = src => new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  async function fetchLogo(url) {
+    if (!url) return null;
+    const bare = url.replace(/^https?:\/\//, '');
+    for (const u of [`https://images.weserv.nl/?url=${encodeURIComponent(bare)}&w=600&h=600&fit=inside&output=png`, url]) {
+      try { return await loadImg(u); } catch (e) {}
+    }
+    return null;
+  }
+  // turn any logo into a white shape on transparent: drop the background, keep the mark
+  function silhouette(im, detail) {
+    const nw = im.naturalWidth || im.width, nh = im.naturalHeight || im.height;
+    const k = Math.min(1, 512 / Math.max(nw, nh));
+    const w = Math.max(1, Math.round(nw * k)), h = Math.max(1, Math.round(nh * k));
+    const c = mkCanvas(w, h), x = c.getContext('2d');
+    x.drawImage(im, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h), p = d.data;
+    let br = 0, bg = 0, bb = 0, ba = 0, bn = 0;
+    for (let i = 0; i < w; i++) for (const j of [0, h - 1]) { const o = (j * w + i) * 4; br += p[o]; bg += p[o + 1]; bb += p[o + 2]; ba += p[o + 3]; bn++; }
+    for (let j = 0; j < h; j++) for (const i of [0, w - 1]) { const o = (j * w + i) * 4; br += p[o]; bg += p[o + 1]; bb += p[o + 2]; ba += p[o + 3]; bn++; }
+    br /= bn; bg /= bn; bb /= bn; ba /= bn;
+    const transparentBg = ba < 128;
+    let cov = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const o = (j * w + i) * 4, a = p[o + 3] / 255;
+      const dist = Math.hypot(p[o] - br, p[o + 1] - bg, p[o + 2] - bb) / 441;
+      let f = transparentBg ? a : a * Math.min(1, Math.max(0, (dist - 0.1) / 0.18));
+      if (detail) f *= Math.min(1, 0.35 + dist * 1.6);
+      p[o] = p[o + 1] = p[o + 2] = 255; p[o + 3] = Math.round(f * 255);
+      if (f > 0.5) { cov++; if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; }
+    }
+    x.putImageData(d, 0, 0);
+    const coverage = cov / (w * h);
+    const out = mkCanvas(1040, 440), ox = out.getContext('2d');
+    if (x1 >= x0 && y1 >= y0) {
+      const cw = x1 - x0 + 1, ch = y1 - y0 + 1, s = Math.min(1000 / cw, 400 / ch);
+      ox.imageSmoothingQuality = 'high';
+      ox.drawImage(c, x0, y0, cw, ch, (1040 - cw * s) / 2, (440 - ch * s) / 2, cw * s, ch * s);
+    }
+    return { canvas: out, coverage, size: Math.max(nw, nh) };
+  }
+  function textLogo(name) {
+    const out = mkCanvas(1040, 440), x = out.getContext('2d');
+    const words = name.toUpperCase().replace(/\s+/g, ' ').trim().split(' ');
+    let lines = [words.join(' ')];
+    if (words.length > 1 && lines[0].length > 12) { const m = Math.ceil(words.length / 2); lines = [words.slice(0, m).join(' '), words.slice(m).join(' ')]; }
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    let px = 220;
+    const fit = () => { x.font = `italic 700 ${px}px "${FONTCFG.title}", sans-serif`; return Math.max(...lines.map(l => x.measureText(l).width)); };
+    while (px > 40 && (fit() > 1000 || px * 1.05 * lines.length > 420)) px -= 6;
+    lines.forEach((l, i) => x.fillText(l, 520, 220 + (i - (lines.length - 1) / 2) * px * 1.0));
+    return out;
+  }
+  function applyLogo() {
+    if (!stCur) return;
+    const style = $('stLogoStyle').value;
+    let art = null, why = '';
+    if (style !== 'text' && stImg) {
+      const r = silhouette(stImg, style === 'detail');
+      const usable = r.size >= 64 && r.coverage > 0.015 && r.coverage < 0.85;
+      if (style !== 'auto' || usable) { art = r.canvas; why = `Logo: ${style === 'detail' ? 'detailed' : 'silhouette'} from the station's ${r.size}px image.`; }
+      else why = `Logo: station name as text (the station's image was ${r.size < 64 ? 'too small, ' + r.size + 'px' : 'too busy or too empty to trace'}).`;
+    } else why = style === 'text' ? 'Logo: station name as text.' : 'Logo: station name as text (no usable image from this station).';
+    if (!art) art = textLogo(stCur.name);
+    logoArt = art; drawLogo(false); logo.userData.tex.needsUpdate = true;
+    const pv = $('stArt'), px = pv.getContext('2d');
+    px.fillStyle = '#000'; px.fillRect(0, 0, pv.width, pv.height);
+    const tint = mkCanvas(1040, 440), tx = tint.getContext('2d');
+    tx.drawImage(art, 0, 0); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = '#4ff0e6'; tx.fillRect(0, 0, 1040, 440);
+    px.drawImage(tint, 0, 0, pv.width, pv.height);
+    return why;
+  }
+  async function selectStation(st) {
+    stCur = st; stImg = null;
+    const name = st.name.trim();
+    setStationText(name.toUpperCase().slice(0, 60));
+    setInfoLines([`STATION: ${name.toUpperCase()}`.slice(0, 40), `STREAM:  ${(st.codec || '?').toUpperCase()} ${st.bitrate ? st.bitrate + 'K' : ''}`,
+                  `REGION:  ${(st.state || st.country || st.countrycode || '').toUpperCase()}`.slice(0, 40), `TAGS:    ${(st.tags || '').toUpperCase().split(',').slice(0, 2).join(', ')}`.slice(0, 40)]);
+    const orig = $('stOrig'); orig.removeAttribute('src'); if (st.favicon) orig.src = st.favicon;
+    stStatus('Loading the logo…');
+    stImg = await fetchLogo(st.favicon);
+    stStatus(applyLogo());
+    playStream(st);
+  }
+  $('stLogoStyle').addEventListener('change', () => { if (stCur) stStatus(applyLogo()); });
+
+  async function playStream(st) {
+    const url = st.url_resolved || st.url;
+    ensureCtx(); actx.resume(); stopClick();
+    if (plainEl) plainEl.pause();
+    if (!mediaEl) {
+      mediaEl = new Audio(); mediaEl.crossOrigin = 'anonymous';
+      mediaNode = actx.createMediaElementSource(mediaEl);
+      mediaNode.connect(visDelay); mediaNode.connect(audDelay);
+      mediaEl.addEventListener('pause', () => { if (mode === 'file') { playing = false; musicUI(); } });
+      mediaEl.addEventListener('play', () => { if (mode === 'file') { playing = true; musicUI(); } });
+    }
+    mediaEl.pause(); mediaEl.loop = false; mediaEl.src = url;
+    fileName = st.name.trim(); mode = 'file'; applySync();
+    try {
+      await mediaEl.play(); playing = true; musicUI();
+      $('stStatus').textContent += ' The EQ follows the live audio.';
+    } catch (e) {
+      // the stream doesn't allow analysis from a web page: still play it, with the demo EQ
+      mediaEl.removeAttribute('src'); mediaEl.load();
+      plainEl = plainEl || new Audio();
+      plainEl.src = url; mode = 'demo'; playing = false; musicUI();
+      try { await plainEl.play(); $('stStatus').textContent += ' This stream blocks analysis from web pages, so the EQ uses the demo animation (the real radio analyses all streams).'; }
+      catch (e2) { $('stStatus').textContent += ' The stream could not be played.'; }
+    }
+  }
+  ['pickBtn', 'clickBtn', 'demoBtn', 'playBtn'].forEach(id => $(id).addEventListener('click', () => { if (plainEl) plainEl.pause(); }));
+
+  // ---------- loop ----------
+  let last = performance.now() / 1000, glitchOn = false, frame = 0;
+  window.radioHead = { active: false, x: 0, y: 0, z: 550, lastSeen: 0 };
+  let piLastSig = null;
+  function tick(nowMs) {
+    const piT0 = performance.now();
+    renderer.info.reset();
+    const t = nowMs / 1000, dt = Math.min(0.05, t - last); last = t;
+    if (S.drift && nowMs > manualUntil) {
+      target.x = 150 * Math.sin(t * 0.23);
+      target.y = 25 + 45 * Math.sin(t * 0.17);
+    }
+    const HT = window.radioHead;
+    if (HT.active && nowMs - HT.lastSeen < 700) {
+      // tracked head drives the view directly; the tracker does its own filtering
+      eye.x = HT.x; eye.y = HT.y; target.x = HT.x; target.y = HT.y;
+      manualUntil = nowMs + 1500;
+      setEye(eye.x, eye.y, HT.z);
+    } else {
+      eye.x += (target.x - eye.x) * Math.min(1, dt * 4);
+      eye.y += (target.y - eye.y) * Math.min(1, dt * 4);
+      setEye(eye.x, eye.y, S.dist);
+    }
+
+    world.scale.z = S.depth;
+    // test version: "Skip repeat work" only redoes the layer, brightness and ghost set-up when a setting changed
+    const piSig = PI.skip === '1' ? JSON.stringify([S, TUNE, GHOST_ON, LAYERS, ELEM_LAYER, EQ_DIM, eqPitch]) : null;
+    if (piSig === null || piSig !== piLastSig) { applyLayers(); applyBrightness(); updateGhosts(); piLastSig = piSig; }
+    unlitU.value = S.showUnlit ? 1 : 0;
+    edgeU.value = TUNE.edge;
+    bloom.strength = S.glow;
+    refl.visible = S.refl;
+    roomGroup.forEach(o => o.visible = S.room);
+    outline.visible = S.frame;
+
+    updateEQ(t, dt);
+    marquee.userData.tex.offset.x = (t * 15 / mqTextW) % 1;
+
+    const g = (t % 3.7) < 0.18;
+    if (g !== glitchOn || g) { drawLogo(g); logo.userData.tex.needsUpdate = true; glitchOn = g; }
+
+    if (PI.glow === 'off') renderer.render(scene, cam); else composer.render();
+    piFrame(nowMs, performance.now() - piT0);
+    if ((frame++ & 7) === 0) {
+      const side = Math.abs(eye.x) < 25 ? 'centre' : (eye.x < 0 ? 'left ' : 'right ') + Math.round(Math.abs(Math.atan2(eye.x, S.dist)) * 180 / Math.PI) + '°';
+      const up = Math.round(Math.atan2(eye.y, S.dist) * 180 / Math.PI);
+      $('eyeOut').innerHTML = `<b>Viewer</b> ${side} · ${up >= 0 ? up + '° above' : -up + '° below'}`;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function start() {
+    // redraw canvases that use web fonts now that fonts are loaded
+    redrawTitles(); drawLabels();
+    drawLogo(false); logo.userData.tex.needsUpdate = true;
+    syncOut(); resize();
+    requestAnimationFrame(tick);
+  }
+  const fontsReady = document.fonts && document.fonts.load
+    ? Promise.all([document.fonts.load('700 40px "Chakra Petch"'), document.fonts.load('600 40px "Chakra Petch"'), document.fonts.load('500 20px "IBM Plex Mono"'), document.fonts.load('500 40px "Rajdhani"'), document.fonts.load('600 40px "Rajdhani"')]).catch(() => {})
+    : Promise.resolve();
+  Promise.race([fontsReady, new Promise(r => setTimeout(r, 1500))]).then(start);
+})();
+</script>
+
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const H = window.radioHead;
+const VER = '0.10.14';
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
+const EYE_MM = 63;          // average distance between pupils
+const CAM_HFOV = 62;        // typical laptop / USB webcam
+
+// settings
+const screenEl = $('screen');
+const C = {
+  width: 265,   // mm, Juan's measured screen width
+  above: 0, gain: 1, smooth: 1,
+};
+C.width = Math.max(150, Math.min(900, Math.round(C.width / 5) * 5));
+function sync() {
+  $('cWidth').value = C.width; $('cWidthOut').textContent = (C.width / 10).toFixed(1) + ' cm';
+  $('cAbove').value = C.above; $('cAboveOut').textContent = (C.above / 10).toFixed(1) + ' cm';
+  $('cGain').value = C.gain; $('cGainOut').textContent = C.gain.toFixed(2) + '×';
+  $('cSmooth').value = C.smooth; $('cSmoothOut').textContent = Math.round(C.smooth * 100) + '%';
+}
+[['cWidth', 'width'], ['cAbove', 'above'], ['cGain', 'gain'], ['cSmooth', 'smooth']].forEach(([id, k]) =>
+  $(id).addEventListener('input', e => { C[k] = +e.target.value; sync(); }));
+sync();
+
+// One Euro filter: smooth when still, responsive when moving
+class OneEuro {
+  constructor() { this.x = null; this.dx = 0; this.t = 0; }
+  alpha(cut, dt) { const r = 2 * Math.PI * cut * dt; return r / (r + 1); }
+  f(x, t) {
+    if (this.x === null) { this.x = x; this.t = t; return x; }
+    const dt = Math.max(1e-3, t - this.t); this.t = t;
+    const minCut = 0.4 + (1 - C.smooth) * 3.0, beta = 0.004 + (1 - C.smooth) * 0.02;
+    const dx = (x - this.x) / dt;
+    this.dx += this.alpha(1.0, dt) * (dx - this.dx);
+    const cut = minCut + beta * Math.abs(this.dx);
+    this.x += this.alpha(cut, dt) * (x - this.x);
+    return this.x;
+  }
+  reset() { this.x = null; this.dx = 0; }
+}
+const fx = new OneEuro(), fy = new OneEuro(), fz = new OneEuro();
+
+const status = t => { $('trkStatus').textContent = t; };
+const cv = $('trkCanvas'), cx = cv.getContext('2d');
+let detector = null, video = null, stream = null, running = false, lastVT = -1, frames = 0, lastStatus = 0;
+
+async function start() {
+  try {
+    $('trkBtn').disabled = true;
+    if (!detector) {
+      status('Loading the face tracker…');
+      const vision = await import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/vision_bundle.mjs`);
+      const files = await vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/wasm`);
+      const opts = d => ({ baseOptions: { modelAssetPath: MODEL, delegate: d }, runningMode: 'VIDEO', minDetectionConfidence: 0.5 });
+      try { detector = await vision.FaceDetector.createFromOptions(files, opts('GPU')); }
+      catch (e) { detector = await vision.FaceDetector.createFromOptions(files, opts('CPU')); }
+    }
+    status('Waiting for webcam permission…');
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+    video = document.createElement('video');
+    video.playsInline = true; video.muted = true; video.srcObject = stream;
+    await video.play();
+    running = true; H.active = true; fx.reset(); fy.reset(); fz.reset();
+    $('trkBtn').textContent = 'Stop head tracking';
+    status('Looking for your face…');
+    requestAnimationFrame(loop);
+  } catch (e) {
+    const why = e && e.name === 'NotAllowedError' ? 'Webcam permission was blocked. Allow the camera for this page in the address bar, then try again.'
+      : e && e.name === 'NotFoundError' ? 'No webcam was found.'
+      : 'Could not start: ' + (e && e.message ? e.message : e) + '. Make sure you opened this file in Chrome or Edge and are online.';
+    status(why);
+  } finally { $('trkBtn').disabled = false; }
+}
+function stop() {
+  running = false; H.active = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  cx.fillStyle = '#000'; cx.fillRect(0, 0, cv.width, cv.height);
+  $('trkBtn').textContent = 'Start head tracking';
+  status('Off. The view is back on the slow drift.');
+}
+$('trkBtn').addEventListener('click', () => running ? stop() : start());
+
+function loop(now) {
+  if (!running) return;
+  if (video.readyState >= 2 && video.currentTime !== lastVT) {
+    lastVT = video.currentTime;
+    const res = detector.detectForVideo(video, now);
+    const d = res.detections && res.detections[0];
+    const vw = video.videoWidth, vh = video.videoHeight;
+    // mirrored preview
+    cx.save(); cx.translate(cv.width, 0); cx.scale(-1, 1);
+    cx.drawImage(video, 0, 0, cv.width, cv.height); cx.restore();
+    cx.fillStyle = 'rgba(0,0,0,0.35)'; cx.fillRect(0, 0, cv.width, cv.height);
+    if (d && d.keypoints && d.keypoints.length >= 2) {
+      const r = d.keypoints[0], l = d.keypoints[1];
+      const mx = (r.x + l.x) / 2, my = (r.y + l.y) / 2;
+      const ipd = Math.hypot((r.x - l.x) * vw, (r.y - l.y) * vh) / vw;          // fraction of image width
+      const tanH = Math.tan(CAM_HFOV / 2 * Math.PI / 180);
+      const dist = EYE_MM / (ipd * 2 * tanH);                                   // mm from the webcam
+      const xMM = -(mx - 0.5) * 2 * tanH * dist;                                // your left is negative
+      const yMM = (0.5 - my) * 2 * tanH * (vh / vw) * dist;
+      const k = 290 / C.width;                                                  // real mm -> scene mm
+      const t = now / 1000;
+      H.x = fx.f(xMM * k * C.gain, t);
+      H.y = fy.f((yMM + C.above) * k * C.gain, t);
+      H.z = Math.max(150, Math.min(3000, fz.f(dist * k, t)));
+      H.lastSeen = now;
+      // draw eyes
+      cx.fillStyle = '#4ff0e6';
+      [r, l].forEach(p => { cx.beginPath(); cx.arc((1 - p.x) * cv.width, p.y * cv.height, 4, 0, Math.PI * 2); cx.fill(); });
+      if (now - lastStatus > 250) { lastStatus = now; status(`Tracking · about ${Math.round(dist / 10)} cm from the webcam`); }
+    } else if (now - H.lastSeen > 700 && now - lastStatus > 250) {
+      lastStatus = now; status('No face found · slow drift until you’re back in view');
+    }
+  }
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
