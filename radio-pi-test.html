@@ -168,6 +168,10 @@ body.bigview .bezel .cap { visibility: hidden; }
           <select id="piGhosts"><option value="on">On (original)</option><option value="off">Off</option></select>
           <label for="piScale">Drawing size</label>
           <select id="piScale"><option value="1">100% (original)</option><option value="0.75">75%</option><option value="0.5">50%</option></select>
+          <label for="piFlat">Hidden layers</label>
+          <select id="piFlat"><option value="0">Drawn (original)</option><option value="1">Skipped</option></select>
+          <label for="piGl">Ghost text layers</label>
+          <select id="piGl"><option value="full">Full (original)</option><option value="thin">Thinner</option></select>
           <label for="piSkip">Skip repeat work</label>
           <select id="piSkip"><option value="0">Off (original)</option><option value="1">On</option></select>
           <label for="piAa">Edge smoothing</label>
@@ -179,7 +183,7 @@ body.bigview .bezel .cap { visibility: hidden; }
           <label for="piSize">Big view size</label>
           <select id="piSize"><option value="real">Exactly 1920 × 720</option><option value="fill">Fill the window</option></select>
         </div>
-        <div class="row2"><button type="button" id="piReset">Reset all to original</button></div>
+        <div class="row2"><button type="button" id="piMode">Pi mode</button> <button type="button" id="piReset">Reset all to original</button></div>
       </div>
     </div>
     <div class="cap"><span>1920 × 720 · 290 × 109 mm</span><span id="eyeOut"><b>Viewer</b> centre</span></div>
@@ -462,8 +466,10 @@ body.bigview .bezel .cap { visibility: hidden; }
     hdr: pick('hdr', ['1', '0'], '1'),
     view: pick('view', ['lock', 'mouse'], 'lock'),
     size: pick('size', ['real', 'fill'], 'real'),
+    flat: pick('flat', ['0', '1'], '0'),
+    gl: pick('gl', ['full', 'thin'], 'full'),
   };
-  const PI_DEFAULT = { glow: 'full', layers: 'full', ghosts: 'on', scale: '1', skip: '0', aa: '1', hdr: '1', view: 'lock', size: 'real' };
+  const PI_DEFAULT = { glow: 'full', layers: 'full', ghosts: 'on', scale: '1', skip: '0', aa: '1', hdr: '1', view: 'lock', size: 'real', flat: '0', gl: 'full' };
   const PI_RELOAD = ['aa', 'hdr'];   // these can only change when the 3D engine starts
   function piSaveUrl() {
     const q = new URLSearchParams();
@@ -1194,11 +1200,19 @@ body.bigview .bezel .cap { visibility: hidden; }
   const PI_STACKS = [nowPlaying, marquee, info, play, logo];
   function piApplyLayers() {
     // each 3D text or logo is a stack of flat copies; i = 0 is the front copy and is always kept
-    PI_STACKS.forEach(src => [src, ...(src.userData.ghosts || [])].forEach(g => {
+    // "Hidden layers: Skipped": things printed flat on the glass are squashed to 4% depth, so their inner copies
+    //   sit under the front copy and can never be seen; keep only the front and back copy.
+    // "Ghost text layers: Thinner": the dim echoes keep every 2nd copy (first echo) or every 4th (second echo).
+    PI_STACKS.forEach((src, si) => [src, ...(src.userData.ghosts || [])].forEach((g, gi) => {
       const n = g.children.length, step = Math.ceil(n / 4);
+      const flat = gi === 0 && PI.flat === '1' && ELEM_LAYER[GHOST_KEYS[si]] === 'front';
+      const thin = gi > 0 && PI.gl === 'thin' ? (gi === 1 ? 2 : 4) : 1;
       g.children.forEach((m, c) => {
         const i = n - 1 - c;
-        m.visible = PI.layers === 'full' || i === 0 || (PI.layers === 'fewer' && i % step === 0);
+        let v = PI.layers === 'full' || i === 0 || (PI.layers === 'fewer' && i % step === 0);
+        if (flat && i !== 0 && i !== n - 1) v = false;
+        if (i % thin !== 0) v = false;
+        m.visible = v;
       });
     }));
   }
@@ -1225,6 +1239,13 @@ body.bigview .bezel .cap { visibility: hidden; }
   $('piReset').addEventListener('click', () => {
     const needReload = PI_RELOAD.some(k => PI[k] !== PI_DEFAULT[k]);
     Object.assign(PI, PI_DEFAULT); piSaveUrl();
+    if (needReload) { location.reload(); return; }
+    piApply();
+  });
+  $('piMode').addEventListener('click', () => {
+    // everything that should not change the picture: skip hidden layers, thinner ghost text, no wasted edge smoothing
+    const needReload = PI.aa !== '0';
+    Object.assign(PI, PI_DEFAULT, { flat: '1', gl: 'thin', aa: '0' }); piSaveUrl();
     if (needReload) { location.reload(); return; }
     piApply();
   });
