@@ -139,6 +139,8 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
         <button type="button" id="zOut" aria-label="Zoom out">−</button>
         <output id="zLbl">1×</output>
         <button type="button" id="zIn" aria-label="Zoom in">+</button>
+        <label for="vol" style="font: 12px var(--body); color: var(--fg);">Vol</label>
+        <input type="range" id="vol" min="0" max="100" step="1" value="100" aria-label="Volume" title="Volume. Shortcut: up and down arrows" style="width: 90px; accent-color: var(--cyan);">
         <button type="button" id="lookBtn" title="Switch between the radio's layout and the phone app's layout (reloads). Shortcut: L">Look: Radio</button>
         <button type="button" id="zBig" aria-pressed="false">Big view</button>
       </div>
@@ -1012,10 +1014,32 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     binsLow = new Float32Array(anLow.frequencyBinCount); binsHigh = new Float32Array(anHigh.frequencyBinCount);
     visDelay = actx.createDelay(1.0); audDelay = actx.createDelay(1.0);
     visDelay.connect(anLow); visDelay.connect(anHigh);
-    audDelay.connect(actx.destination);
+    volGain = actx.createGain(); audDelay.connect(volGain); volGain.connect(actx.destination);
+    applyVol();
     applySync();
     return actx;
   }
+  // Volume: one slider for everything the page plays; remembered in this browser. The EQ is not affected.
+  let volGain = null, VOL = 1;
+  try { const v = parseFloat(localStorage.getItem('radio3d-vol')); if (v >= 0 && v <= 1) VOL = v; } catch (e) {}
+  function applyVol() {
+    const g = VOL * VOL;                 // squared, so the slider feels even to the ear
+    if (volGain) volGain.gain.value = g;
+    if (typeof plainEl !== 'undefined' && plainEl) plainEl.volume = g;
+  }
+  function setVol(v) {
+    VOL = Math.max(0, Math.min(1, v));
+    $('vol').value = Math.round(VOL * 100);
+    try { localStorage.setItem('radio3d-vol', String(VOL)); } catch (e) {}
+    applyVol();
+  }
+  $('vol').value = Math.round(VOL * 100);
+  $('vol').addEventListener('input', e => setVol(e.target.value / 100));
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test((e.target && e.target.tagName) || '')) return;
+    if (e.key === 'ArrowUp') { setVol(VOL + 0.05); e.preventDefault(); }
+    if (e.key === 'ArrowDown') { setVol(VOL - 0.05); e.preventDefault(); }
+  });
   function applySync() {
     if (!actx) return;
     latMs = Math.round(((actx.outputLatency || 0) + (actx.baseLatency || 0)) * 1000);
@@ -1569,7 +1593,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     } catch (e) {
       // the stream doesn't allow analysis from a web page: still play it, with the demo EQ
       mediaEl.removeAttribute('src'); mediaEl.load();
-      plainEl = plainEl || new Audio();
+      plainEl = plainEl || new Audio(); applyVol();
       plainEl.src = url; mode = 'demo'; playing = false; musicUI();
       try { await plainEl.play(); $('stStatus').textContent += ' This stream blocks analysis from web pages, so the EQ uses the demo animation (the real radio analyses all streams).'; }
       catch (e2) { $('stStatus').textContent += ' The stream could not be played.'; }
