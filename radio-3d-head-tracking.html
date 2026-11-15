@@ -1341,7 +1341,7 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
 
   // ---------- real internet stations (Radio Browser) ----------
   const RB_HOSTS = ['all.api.radio-browser.info', 'de1.api.radio-browser.info', 'de2.api.radio-browser.info', 'fi1.api.radio-browser.info', 'nl1.api.radio-browser.info'];
-  let stImg = null, stCur = null, plainEl = null;
+  let stImg = null, stCur = null, plainEl = null, playGen = 0;
   const stStatus = t => { $('stStatus').textContent = t; };
   const PAGE = 60;
   async function rbGet(path, params) {
@@ -1569,7 +1569,23 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
       let st = null;
       try { st = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) {}
       if (!st || !(st.url_resolved || st.url)) st = favs[0] || null;
-      if (st && st.name && (st.url_resolved || st.url)) selectStation(st);
+      if (!st || !st.name || !(st.url_resolved || st.url)) return;
+      // Tune in once the screen is really showing, then keep trying until sound is actually running.
+      // Stops as soon as you touch the radio, so it never fights what you choose.
+      let touched = false, tries = 0;
+      ['pointerdown', 'keydown'].forEach(t => window.addEventListener(t, () => { touched = true; }, { once: true, capture: true }));
+      const running = () => [mediaEl, plainEl].some(a => a && !a.paused && a.currentTime > 0.2);
+      const check = () => {
+        if (touched || stCur !== st || running() || ++tries > 20) return;
+        stStatus(`Tuning in again (try ${tries + 1})…`);
+        playStream(st); setTimeout(check, 6000);
+      };
+      const go = () => { selectStation(st); setTimeout(check, 8000); };
+      const whenVisible = () => {
+        if (document.visibilityState === 'visible') setTimeout(go, 1000);
+        else document.addEventListener('visibilitychange', whenVisible, { once: true });
+      };
+      whenVisible();
     }, 0);
   }
   $('stLogoStyle').addEventListener('change', () => { if (stCur) stStatus(applyLogo()); });
@@ -1587,10 +1603,12 @@ body.bigview .bezel, body.bigview .bezel.pinned { z-index: 101; }
     }
     mediaEl.pause(); mediaEl.loop = false; mediaEl.src = url;
     fileName = st.name.trim(); mode = 'file'; applySync();
+    const gen = ++playGen;               // a newer request replaces this one; old ones must not undo it
     try {
-      await mediaEl.play(); playing = true; musicUI();
+      await mediaEl.play(); if (gen !== playGen) return; playing = true; musicUI();
       $('stStatus').textContent += ' The EQ follows the live audio.';
     } catch (e) {
+      if (gen !== playGen) return;
       // the stream doesn't allow analysis from a web page: still play it, with the demo EQ
       mediaEl.removeAttribute('src'); mediaEl.load();
       plainEl = plainEl || new Audio(); applyVol();
